@@ -82,7 +82,7 @@ if 'carrito' not in st.session_state:
 # Encabezado
 col_head1, col_head2 = st.columns([2, 1])
 with col_head1:
-    cliente = st.text_input("Nombre del Prospecto", placeholder="Ej: Javier González")
+    cliente = st.text_input("Nombre del Cliente", placeholder="Ej: Pablo Pérez")
 with col_head2:
     st.write(f"Folio")
     st.subheader(f"#{st.session_state.n_folio}")
@@ -153,3 +153,4 @@ if st.session_state.carrito:
         
 
         actualizar_consecutivo(st.session_state.n_folio + 1)
+

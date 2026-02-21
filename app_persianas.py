@@ -1,23 +1,35 @@
 import streamlit as st
 from fpdf import FPDF
-import os
+import requests
+import json
 from datetime import datetime
-import pandas as pd
 
-# --- LÓGICA DE CONSECUTIVO ---
-if not os.path.exists("ultimo_consecutivo.txt"):
-    with open("ultimo_consecutivo.txt", "w") as f:
-        f.write("100")
+# --- CONFIGURACIÓN DE TU INFRAESTRUCTURA ---
+# URL de tu Google Apps Script (Implementación "Histórico cotizaciones")
+URL_APPSCRIPT = "https://script.google.com/macros/s/AKfycbycgEmOPs4jcFbAL2teXmaDUamNnP-ZhAExYwvKjM9aTe-DiNzAiLlrgZ5SUwkAxM01LQ/exec"
 
+# --- LÓGICA DE CONSECUTIVO DESDE LA NUBE ---
 def obtener_consecutivo():
-    with open("ultimo_consecutivo.txt", "r") as f:
-        return int(f.read())
+    try:
+        # Consultamos el último folio registrado en la hoja de cálculo
+        response = requests.get(URL_APPSCRIPT, timeout=10)
+        if response.status_code == 200:
+            # El script devuelve el último número; sumamos 1 para el nuevo
+            return int(response.text) + 1
+        return 100
+    except Exception:
+        # Si hay error de conexión, iniciamos en 100 por defecto
+        return 100
 
-def actualizar_consecutivo(nuevo_valor):
-    with open("ultimo_consecutivo.txt", "w") as f:
-        f.write(str(nuevo_valor))
+def registrar_en_nube(datos):
+    try:
+        # Enviamos los datos en formato JSON a la hoja de cálculo
+        response = requests.post(URL_APPSCRIPT, data=json.dumps(datos), timeout=10)
+        return response.status_code == 200
+    except Exception:
+        return False
 
-# --- FUNCIÓN PDF E HISTÓRICO ---
+# --- FUNCIÓN PDF ---
 def crear_pdf(datos_cliente, lista_items):
     pdf = FPDF()
     pdf.add_page()
@@ -31,7 +43,7 @@ def crear_pdf(datos_cliente, lista_items):
     pdf.cell(200, 10, txt=f"Cliente: {datos_cliente['cliente']}", ln=True)
     pdf.ln(5)
 
-    # Tabla
+    # Encabezados de Tabla
     pdf.set_fill_color(230, 230, 230)
     pdf.set_font("Arial", 'B', 9)
     pdf.cell(12, 10, "Cant.", border=1, fill=True, align='C')
@@ -67,28 +79,26 @@ def crear_pdf(datos_cliente, lista_items):
     
     return pdf.output(dest='S').encode('latin-1'), subtotal_acumulado, impuesto, total_gral, " | ".join(resumen_items)
 
-# --- CONFIGURACIÓN DE APP ---
+# --- CONFIGURACIÓN DE APP STREAMLIT ---
 st.set_page_config(page_title='Cotizaciones Persianas', layout="centered")
 st.title('🪟 Persianas Steven')
-
-# Variable para el link de Google Sheets de Steven
-URL_HOJA = "" 
 
 if 'n_folio' not in st.session_state:
     st.session_state.n_folio = obtener_consecutivo()
 if 'carrito' not in st.session_state:
     st.session_state.carrito = []
 
-# Encabezado
+# Encabezado de Cliente y Folio
 col_head1, col_head2 = st.columns([2, 1])
 with col_head1:
     cliente = st.text_input("Nombre del Cliente", placeholder="Ej: Pablo Pérez")
 with col_head2:
-    st.write(f"Folio")
+    st.write(f"Folio Actual")
     st.subheader(f"#{st.session_state.n_folio}")
 
 st.divider()
 
+# Parámetros de la persiana
 usar_pulgadas = st.toggle("📐 Usar Pulgadas (in)", value=False)
 unidad = "in" if usar_pulgadas else "m"
 
@@ -102,7 +112,7 @@ with col2:
 
 cantidad = st.number_input("Cantidad de persianas", min_value=1, value=1)
 
-# --- CÁLCULOS ---
+# Lógica de Cálculos (se mantiene tu fórmula original)
 factor = 0.0254 if usar_pulgadas else 1.0
 a_m = ancho * factor
 l_m = largo * factor
@@ -111,11 +121,9 @@ precios_m2 = {"Blackout": 48000, "Screen": 58000, "Sheer Elegance": 88000}
 p_unit = (area_f * precios_m2[tipo_tela]) + (165000 if motor == "Motorizada" else 0)
 sub_item = p_unit * cantidad
 
-# Visualización de cálculos en tiempo real
 st.info(f"Área facturable: {area_f:.2f} m² (incluye 15% desperdicio)")
 st.success(f"## Subtotal Ítem: ${sub_item:,.0f}")
 
-# BOTÓN CORREGIDO
 if st.button("➕ Agregar al carrito", use_container_width=True):
     st.session_state.carrito.append({
         "cantidad": cantidad, "tela": tipo_tela, "motor": motor,
@@ -124,7 +132,7 @@ if st.button("➕ Agregar al carrito", use_container_width=True):
     })
     st.toast("Añadido al carrito")
 
-# --- RESUMEN DEL CARRITO Y REGISTRO ---
+# --- RESUMEN Y ACCIÓN DE GUARDADO ---
 if st.session_state.carrito:
     st.divider()
     st.subheader("🛒 Carrito de Cotización")
@@ -132,7 +140,7 @@ if st.session_state.carrito:
     for idx, it in enumerate(st.session_state.carrito):
         st.write(f"**{it['cantidad']}x** {it['tela']} ({it['ancho']}x{it['largo']} {it['unit']}) - ${it['subtotal_item']:,.0f}")
 
-    if st.button("💾 Guardar en Histórico y Generar PDF", use_container_width=True):
+    if st.button("💾 Guardar en Historial y Generar PDF", use_container_width=True):
         datos_pdf = {
             "consecutivo": st.session_state.n_folio, 
             "fecha": datetime.now().strftime("%d/%m/%Y"), 
@@ -141,15 +149,28 @@ if st.session_state.carrito:
         
         pdf_bytes, sub, imp, tot, res = crear_pdf(datos_pdf, st.session_state.carrito)
         
-        st.write("📁 Registrando en el Histórico de Cotizaciones...")
-        
-        # Botón de descarga final
+        # Preparar datos para Google Sheets
+        datos_registro = {
+            "folio": st.session_state.n_folio,
+            "fecha": datos_pdf["fecha"],
+            "cliente": datos_pdf["cliente"],
+            "items": res,
+            "total": tot
+        }
+
+        # Registrar en la nube
+        with st.spinner("Registrando cotización en la nube..."):
+            if registrar_en_nube(datos_registro):
+                st.success(f"✅ Cotización #{st.session_state.n_folio} guardada en Google Sheets")
+                # Solo si se guardó con éxito, actualizamos el folio para la siguiente
+                st.session_state.n_folio += 1
+            else:
+                st.error("❌ Error al guardar en la nube. Revisa tu conexión.")
+
+        # Botón de descarga del PDF generado
         st.download_button(
             label="📩 Descargar PDF para enviar",
             data=pdf_bytes,
-            file_name=f"Cotizacion_{st.session_state.n_folio}.pdf",
+            file_name=f"Cotizacion_{datos_pdf['consecutivo']}.pdf",
             mime="application/pdf"
         )
-        
-
-        actualizar_consecutivo(st.session_state.n_folio + 1)

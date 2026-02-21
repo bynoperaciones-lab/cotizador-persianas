@@ -172,3 +172,4 @@ if st.session_state.carrito:
             file_name=f"Cotizacion_{datos_pdf['consecutivo']}.pdf",
             mime="application/pdf"
         )
+

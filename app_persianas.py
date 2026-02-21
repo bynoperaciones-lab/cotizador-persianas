@@ -31,7 +31,7 @@ def generar_pdf_pro(n_folio, nombre_cliente, carrito):
     pdf.cell(200, 15, txt='Persianas Steven', ln=True, align='C')
     pdf.ln(10)
     pdf.set_font("Arial", 'B', 12)
-    pdf.cell(100, 10, txt=f"Cotización No: {n_folio}")
+    pdf.cell(100, 10, txt=f"Cotizacion No: {n_folio}")
     pdf.cell(100, 10, txt=f"Fecha: {datetime.now().strftime('%d/%m/%Y')}", ln=True, align='R')
     pdf.set_font("Arial", '', 12)
     pdf.cell(200, 10, txt=f"Cliente: {nombre_cliente}", ln=True)
@@ -40,7 +40,7 @@ def generar_pdf_pro(n_folio, nombre_cliente, carrito):
     pdf.set_fill_color(230, 230, 230)
     pdf.set_font("Arial", 'B', 9)
     pdf.cell(12, 10, "Cant.", border=1, fill=True, align='C')
-    pdf.cell(85, 10, u"Descripción", border=1, fill=True, align='C')
+    pdf.cell(85, 10, u"Descripcion", border=1, fill=True, align='C')
     pdf.cell(43, 10, "Precio Unit.", border=1, fill=True, align='C')
     pdf.cell(50, 10, "Subtotal", border=1, fill=True, align='C', ln=True)
     
@@ -68,11 +68,24 @@ def generar_pdf_pro(n_folio, nombre_cliente, carrito):
     pdf.cell(50, 10, f"${total_gral:,.0f}", border=1, ln=True, align='R', fill=True)
     return pdf.output(dest='S').encode('latin-1'), total_gral
 
+# --- LÓGICA DE LIMPIEZA SEGURA ---
+def limpiar_campos_item():
+    st.session_state.anc = 0.0
+    st.session_state.lar = 0.0
+    st.session_state.tel = "Seleccione..."
+    st.session_state.mot = "Manual"
+    st.session_state.can = 1
+
+def limpiar_todo():
+    st.session_state.carrito = []
+    st.session_state.cli = ""
+    limpiar_campos_item()
+
 # --- TÍTULO ---
 st.markdown('<link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">', unsafe_allow_html=True)
 st.markdown("<h1 style='display: flex; align-items: center;'><i class='material-icons' style='font-size: 45px; margin-right: 15px; color: #4F8BF9;'>window</i>Persianas Steven</h1>", unsafe_allow_html=True)
 
-# --- ESTADO DE SESIÓN ---
+# --- INICIALIZACIÓN DE ESTADO ---
 if 'n_folio' not in st.session_state:
     st.session_state.n_folio = obtener_consecutivo()
 if 'carrito' not in st.session_state:
@@ -114,12 +127,8 @@ if ancho > 0 and largo > 0 and tipo_tela != "Seleccione...":
             "descripcion": f"{tipo_tela} ({ancho}x{largo}{unidad}) {motor}",
             "subtotal_item": sub_total_item
         })
-        # LIMPIEZA DE CAMPOS DE ÍTEM (resetea ancho, largo, tela, motor, cantidad)
-        st.session_state.anc = 0.0
-        st.session_state.lar = 0.0
-        st.session_state.tel = "Seleccione..."
-        st.session_state.can = 1
         st.toast("Ítem añadido")
+        limpiar_campos_item()
         st.rerun()
 
 # --- ACCIONES FINALES ---
@@ -150,10 +159,8 @@ if st.session_state.carrito:
         
         if registrar_en_nube(datos_nube):
             st.success("✅ Datos enviados.")
-            # LIMPIEZA TOTAL (Carrito, Folio y Cliente)
-            st.session_state.carrito = []
-            st.session_state.cli = ""
             st.session_state.n_folio = obtener_consecutivo()
+            limpiar_todo()
             st.rerun()
         else:
             st.error("❌ Error de comunicación.")

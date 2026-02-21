@@ -1,8 +1,12 @@
+# -*- coding: utf-8 -*-
 import streamlit as st
 from fpdf import FPDF
 import requests
 import json
 from datetime import datetime
+
+# --- CONFIGURACIÓN DE PÁGINA (Debe ir de primero) ---
+st.set_page_config(page_title="Persianas Steven", page_icon="🪟", layout="centered")
 
 # --- CONFIGURACIÓN DE TU INFRAESTRUCTURA ---
 URL_APPSCRIPT = "https://script.google.com/macros/s/AKfycbxIVWcaeWurbiWqjkXtwsgaez0GYakPmLJYdgkXY9pt5d9bSXEM14O_xfgP_GaFJzontQ/exec"
@@ -59,7 +63,6 @@ def crear_pdf(datos_cliente, lista_items):
         pdf.cell(40, 10, f"${item['subtotal_item']:,.0f}", border=1, align='R', ln=True)
         
         subtotal_acumulado += item['subtotal_item']
-        # Formateamos la descripción para la columna D de Google Sheets
         desc = f"{item['cantidad']}x {item['tela']} ({item['ancho']}x{item['largo']} {item['unit']}) {item['motor']}"
         items_desc_nube.append(desc)
 
@@ -78,9 +81,8 @@ def crear_pdf(datos_cliente, lista_items):
     
     return pdf.output(dest='S').encode('latin-1'), total_gral, " | ".join(items_desc_nube)
 
-# --- CONFIGURACIÓN DE APP STREAMLIT ---
-st.set_page_config(page_title='Cotizaciones Persianas', layout="centered")
-st.title('\U0001FA9F Persianas Steven')
+# --- TÍTULO DE LA APP ---
+st.markdown("# 🪟 Persianas Steven")
 
 if 'n_folio' not in st.session_state:
     st.session_state.n_folio = obtener_consecutivo()
@@ -148,7 +150,6 @@ if st.session_state.carrito:
         
         pdf_bytes, valor_total, descripcion_nube = crear_pdf(datos_pdf, st.session_state.carrito)
         
-        # Datos organizados para el nuevo Apps Script (A:Folio, B:Fecha, C:Cliente, D:Descripción, E:Cantidad, F:Total)
         datos_registro = {
             "folio": st.session_state.n_folio,
             "fecha": datos_pdf["fecha"],
@@ -162,7 +163,7 @@ if st.session_state.carrito:
             if registrar_en_nube(datos_registro):
                 st.success(f"✅ Cotización #{st.session_state.n_folio} guardada.")
                 st.session_state.n_folio += 1
-                st.session_state.carrito = [] # Limpiamos carrito tras guardar
+                st.session_state.carrito = [] 
             else:
                 st.error("❌ Error al guardar. Verifica la conexión.")
 
@@ -172,6 +173,3 @@ if st.session_state.carrito:
             file_name=f"Cotizacion_{datos_pdf['consecutivo']}.pdf",
             mime="application/pdf"
         )
-
-
-

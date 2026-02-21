@@ -153,4 +153,3 @@ if st.session_state.carrito:
         
 
         actualizar_consecutivo(st.session_state.n_folio + 1)
-

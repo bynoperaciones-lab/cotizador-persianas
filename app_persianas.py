@@ -23,74 +23,59 @@ def registrar_en_nube(datos):
         return response.status_code == 200
     except: return False
 
-# --- FUNCIÓN PDF (RESTAURADA A LA VERSIÓN PROFESIONAL) ---
+# --- FUNCIÓN PDF PROFESIONAL ---
 def generar_pdf_pro(n_folio, nombre_cliente, carrito):
     pdf = FPDF()
     pdf.add_page()
-    
-    # Encabezado Principal
     pdf.set_font("Arial", 'B', 20)
     pdf.cell(200, 15, txt='Persianas Steven', ln=True, align='C')
     pdf.ln(10)
-    
-    # Información de Cotización
     pdf.set_font("Arial", 'B', 12)
     pdf.cell(100, 10, txt=f"Cotización No: {n_folio}")
     pdf.cell(100, 10, txt=f"Fecha: {datetime.now().strftime('%d/%m/%Y')}", ln=True, align='R')
     pdf.set_font("Arial", '', 12)
     pdf.cell(200, 10, txt=f"Cliente: {nombre_cliente}", ln=True)
     pdf.ln(5)
-
-    # Tabla de Ítems con Formato
     pdf.set_fill_color(230, 230, 230)
     pdf.set_font("Arial", 'B', 9)
     pdf.cell(12, 10, "Cant.", border=1, fill=True, align='C')
-    pdf.cell(65, 10, u"Descripción", border=1, fill=True, align='C')
-    pdf.cell(35, 10, "Medidas", border=1, fill=True, align='C')
-    pdf.cell(38, 10, "Precio Unit.", border=1, fill=True, align='C')
-    pdf.cell(40, 10, "Subtotal", border=1, fill=True, align='C', ln=True)
-
+    pdf.cell(85, 10, u"Descripción", border=1, fill=True, align='C')
+    pdf.cell(43, 10, "Precio Unit.", border=1, fill=True, align='C')
+    pdf.cell(50, 10, "Subtotal", border=1, fill=True, align='C', ln=True)
     pdf.set_font("Arial", size=9)
     subtotal_acumulado = 0
-    
     for item in carrito:
-        # Extraemos medidas del texto de descripción para la columna de medidas del PDF
-        # El formato guardado es "Tela (Ancho x Largo Unidad) Motor"
         pdf.cell(12, 10, str(item['cantidad']), border=1, align='C')
-        pdf.cell(65, 10, item['descripcion'], border=1)
-        pdf.cell(35, 10, "Ver desc.", border=1, align='C') # Simplificado para evitar errores de parseo
-        pdf.cell(38, 10, f"${(item['subtotal_item']/item['cantidad']):,.0f}", border=1, align='R')
-        pdf.cell(40, 10, f"${item['subtotal_item']:,.0f}", border=1, align='R', ln=True)
+        pdf.cell(85, 10, item['descripcion'], border=1)
+        pdf.cell(43, 10, f"${(item['subtotal_item']/item['cantidad']):,.0f}", border=1, align='R')
+        pdf.cell(50, 10, f"${item['subtotal_item']:,.0f}", border=1, align='R', ln=True)
         subtotal_acumulado += item['subtotal_item']
-
     pdf.ln(5)
     impuesto = subtotal_acumulado * 0.07
     total_gral = subtotal_acumulado + impuesto
-
-    # Totales Finales con Estilo
     pdf.set_font("Arial", 'B', 10)
-    pdf.cell(150, 8, "SUBTOTAL:", align='R')
-    pdf.cell(40, 8, f"${subtotal_acumulado:,.0f}", border=1, ln=True, align='R')
-    pdf.cell(150, 8, "IMPUESTO (7%):", align='R')
-    pdf.cell(40, 8, f"${impuesto:,.0f}", border=1, ln=True, align='R')
+    pdf.cell(140, 8, "SUBTOTAL:", align='R')
+    pdf.cell(50, 8, f"${subtotal_acumulado:,.0f}", border=1, ln=True, align='R')
+    pdf.cell(140, 8, "IMPUESTO (7%):", align='R')
+    pdf.cell(50, 8, f"${impuesto:,.0f}", border=1, ln=True, align='R')
     pdf.set_font("Arial", 'B', 12)
     pdf.set_fill_color(240, 240, 240)
-    pdf.cell(150, 10, "TOTAL COTIZADO:", align='R')
-    pdf.cell(40, 10, f"${total_gral:,.0f}", border=1, ln=True, align='R', fill=True)
-    
+    pdf.cell(140, 10, "TOTAL COTIZADO:", align='R')
+    pdf.cell(50, 10, f"${total_gral:,.0f}", border=1, ln=True, align='R', fill=True)
     return pdf.output(dest='S').encode('latin-1'), total_gral
 
-# --- TÍTULO Y LOGO ---
+# --- TÍTULO ---
 st.markdown('<link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">', unsafe_allow_html=True)
 st.markdown("<h1 style='display: flex; align-items: center;'><i class='material-icons' style='font-size: 45px; margin-right: 15px; color: #4F8BF9;'>window</i>Persianas Steven</h1>", unsafe_allow_html=True)
 
-# --- ESTADO DE SESIÓN ---
+# --- INICIALIZACIÓN DE ESTADO ---
 if 'n_folio' not in st.session_state:
     st.session_state.n_folio = obtener_consecutivo()
 if 'carrito' not in st.session_state:
     st.session_state.carrito = []
 
-# --- ENTRADA DE DATOS ---
+# --- FORMULARIO CON LIMPIEZA AUTOMÁTICA ---
+# Al no definir un 'value' fijo y usar 'key', st.rerun() los pondrá en blanco
 cliente = st.text_input("Nombre del Cliente", placeholder="Ej: Pablo Pérez", key="cli")
 st.write(f"Folio Actual: **#{st.session_state.n_folio}**")
 
@@ -109,7 +94,7 @@ with col2:
 
 cantidad = st.number_input("Cantidad de persianas", min_value=1, step=1, key="can")
 
-# Cálculos Exactos
+# Lógica de Cálculos
 if ancho > 0 and largo > 0 and tipo_tela != "Seleccione...":
     factor = 0.0254 if usar_pulgadas else 1.0
     area_f = (ancho * factor * largo * factor) * 1.15
@@ -126,27 +111,26 @@ if ancho > 0 and largo > 0 and tipo_tela != "Seleccione...":
             "descripcion": f"{tipo_tela} ({ancho}x{largo}{unidad}) {motor}",
             "subtotal_item": sub_total_item
         })
-        st.toast("Añadido")
+        st.toast("Ítem agregado")
 
-# --- RESUMEN Y ACCIONES ---
+# --- ACCIONES FINALES ---
 if st.session_state.carrito:
     st.divider()
-    st.subheader("🛒 Resumen")
+    st.subheader("🛒 Carrito Actual")
     for it in st.session_state.carrito:
         st.write(f"**{it['cantidad']}x** {it['descripcion']} — ${it['subtotal_item']:,.0f}")
     
-    # Generamos el PDF profesional
     pdf_output, total_final = generar_pdf_pro(st.session_state.n_folio, cliente, st.session_state.carrito)
     
     st.download_button(
-        label="📩 Descargar Cotización PDF (Versión Profesional)",
+        label="📩 Descargar PDF antes de guardar",
         data=pdf_output,
         file_name=f"Cotizacion_{st.session_state.n_folio}.pdf",
         mime="application/pdf",
         use_container_width=True
     )
 
-    if st.button("💾 REGISTRAR Y LIMPIAR TODO", use_container_width=True, type="primary"):
+    if st.button("💾 REGISTRAR Y LIMPIAR PARA NUEVA COTIZACIÓN", use_container_width=True, type="primary"):
         datos_nube = {
             "folio": st.session_state.n_folio,
             "fecha": datetime.now().strftime("%d/%m/%Y"),
@@ -156,7 +140,10 @@ if st.session_state.carrito:
         }
         
         if registrar_en_nube(datos_nube):
-            st.success("✅ ¡Éxito! Hoja actualizada y App limpia.")
+            st.success("✅ Datos enviados. Reiniciando formulario...")
+            # Aquí ocurre la magia: vaciamos el carrito y forzamos el reinicio de la interfaz
             st.session_state.carrito = []
             st.session_state.n_folio = obtener_consecutivo()
-            st.rerun()
+            st.rerun() # Esto borra todos los inputs de texto y números
+        else:
+            st.error("❌ Error de comunicación con la hoja de cálculo.")

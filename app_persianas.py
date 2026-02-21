@@ -68,47 +68,39 @@ def generar_pdf_pro(n_folio, nombre_cliente, carrito):
     pdf.cell(50, 10, f"${total_gral:,.0f}", border=1, ln=True, align='R', fill=True)
     return pdf.output(dest='S').encode('latin-1'), total_gral
 
-# --- LÓGICA DE LIMPIEZA SEGURA ---
-def limpiar_campos_item():
-    st.session_state.anc = 0.0
-    st.session_state.lar = 0.0
-    st.session_state.tel = "Seleccione..."
-    st.session_state.mot = "Manual"
-    st.session_state.can = 1
-
-def limpiar_todo():
+# --- ESTADO DE SESIÓN ---
+if 'n_folio' not in st.session_state:
+    st.session_state.n_folio = obtener_consecutivo()
+if 'carrito' not in st.session_state:
     st.session_state.carrito = []
-    st.session_state.cli = ""
-    limpiar_campos_item()
+if 'form_id' not in st.session_state:
+    st.session_state.form_id = 0
 
 # --- TÍTULO ---
 st.markdown('<link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">', unsafe_allow_html=True)
 st.markdown("<h1 style='display: flex; align-items: center;'><i class='material-icons' style='font-size: 45px; margin-right: 15px; color: #4F8BF9;'>window</i>Persianas Steven</h1>", unsafe_allow_html=True)
 
-# --- INICIALIZACIÓN DE ESTADO ---
-if 'n_folio' not in st.session_state:
-    st.session_state.n_folio = obtener_consecutivo()
-if 'carrito' not in st.session_state:
-    st.session_state.carrito = []
-
 # --- FORMULARIO ---
-cliente = st.text_input("Nombre del Cliente", placeholder="Ej: Pablo Pérez", key="cli")
+# Usamos el form_id en la llave del cliente para limpiarlo también
+cliente = st.text_input("Nombre del Cliente", placeholder="Ej: Pablo Pérez", key=f"cli_{st.session_state.form_id}")
 st.write(f"Folio Actual: **#{st.session_state.n_folio}**")
 
 st.divider()
 
-usar_pulgadas = st.toggle("📐 Usar Pulgadas (in)", value=False, key="pulg")
+usar_pulgadas = st.toggle("📐 Usar Pulgadas (in)", value=False, key=f"pulg_{st.session_state.form_id}")
 unidad = "in" if usar_pulgadas else "m"
 
-col1, col2 = st.columns(2)
-with col1:
-    ancho = st.number_input(f"Ancho ({unidad})", min_value=0.0, step=0.01, format="%.2f", key="anc")
-    tipo_tela = st.selectbox("Tipo de Tela", ["Seleccione...", "Blackout", "Screen", "Sheer Elegance"], key="tel")
-with col2:
-    largo = st.number_input(f"Largo ({unidad})", min_value=0.0, step=0.01, format="%.2f", key="lar")
-    motor = st.radio("Accionamiento", ["Manual", "Motorizada"], key="mot")
+# Contenedor para los campos del ítem
+with st.container():
+    col1, col2 = st.columns(2)
+    with col1:
+        ancho = st.number_input(f"Ancho ({unidad})", min_value=0.0, step=0.01, format="%.2f", key=f"anc_{st.session_state.form_id}")
+        tipo_tela = st.selectbox("Tipo de Tela", ["Seleccione...", "Blackout", "Screen", "Sheer Elegance"], key=f"tel_{st.session_state.form_id}")
+    with col2:
+        largo = st.number_input(f"Largo ({unidad})", min_value=0.0, step=0.01, format="%.2f", key=f"lar_{st.session_state.form_id}")
+        motor = st.radio("Accionamiento", ["Manual", "Motorizada"], key=f"mot_{st.session_state.form_id}")
 
-cantidad = st.number_input("Cantidad de persianas", min_value=1, step=1, key="can")
+    cantidad = st.number_input("Cantidad de persianas", min_value=1, step=1, key=f"can_{st.session_state.form_id}")
 
 # Cálculos
 if ancho > 0 and largo > 0 and tipo_tela != "Seleccione...":
@@ -128,13 +120,14 @@ if ancho > 0 and largo > 0 and tipo_tela != "Seleccione...":
             "subtotal_item": sub_total_item
         })
         st.toast("Ítem añadido")
-        limpiar_campos_item()
+        # Cambiamos el ID del formulario para que todos los campos se limpien al recargar
+        st.session_state.form_id += 1
         st.rerun()
 
 # --- ACCIONES FINALES ---
 if st.session_state.carrito:
     st.divider()
-    st.subheader("🛒 Carrito Actual")
+    st.subheader("🛒 Resumen")
     for it in st.session_state.carrito:
         st.write(f"**{it['cantidad']}x** {it['descripcion']} — ${it['subtotal_item']:,.0f}")
     
@@ -159,8 +152,10 @@ if st.session_state.carrito:
         
         if registrar_en_nube(datos_nube):
             st.success("✅ Datos enviados.")
+            # Reset total
+            st.session_state.carrito = []
             st.session_state.n_folio = obtener_consecutivo()
-            limpiar_todo()
+            st.session_state.form_id += 1 # Limpia cliente e ítems
             st.rerun()
         else:
             st.error("❌ Error de comunicación.")

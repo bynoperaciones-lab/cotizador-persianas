@@ -5,25 +5,20 @@ import json
 from datetime import datetime
 
 # --- CONFIGURACIÓN DE TU INFRAESTRUCTURA ---
-# URL de tu Google Apps Script (Implementación "Histórico cotizaciones")
-URL_APPSCRIPT = "https://script.google.com/macros/s/AKfycbycgEmOPs4jcFbAL2teXmaDUamNnP-ZhAExYwvKjM9aTe-DiNzAiLlrgZ5SUwkAxM01LQ/exec"
+URL_APPSCRIPT = "https://script.google.com/macros/s/AKfycbxIVWcaeWurbiWqjkXtwsgaez0GYakPmLJYdgkXY9pt5d9bSXEM14O_xfgP_GaFJzontQ/exec"
 
 # --- LÓGICA DE CONSECUTIVO DESDE LA NUBE ---
 def obtener_consecutivo():
     try:
-        # Consultamos el último folio registrado en la hoja de cálculo
         response = requests.get(URL_APPSCRIPT, timeout=10)
         if response.status_code == 200:
-            # El script devuelve el último número; sumamos 1 para el nuevo
             return int(response.text) + 1
         return 100
     except Exception:
-        # Si hay error de conexión, iniciamos en 100 por defecto
         return 100
 
 def registrar_en_nube(datos):
     try:
-        # Enviamos los datos en formato JSON a la hoja de cálculo
         response = requests.post(URL_APPSCRIPT, data=json.dumps(datos), timeout=10)
         return response.status_code == 200
     except Exception:
@@ -54,15 +49,19 @@ def crear_pdf(datos_cliente, lista_items):
 
     pdf.set_font("Arial", size=9)
     subtotal_acumulado = 0
-    resumen_items = []
+    items_desc_nube = []
+    
     for item in lista_items:
         pdf.cell(12, 10, str(item['cantidad']), border=1, align='C')
         pdf.cell(65, 10, f"{item['tela']} ({item['motor']})", border=1)
         pdf.cell(35, 10, f"{item['ancho']}x{item['largo']} {item['unit']}", border=1, align='C')
         pdf.cell(38, 10, f"${item['precio_unitario']:,.0f}", border=1, align='R')
         pdf.cell(40, 10, f"${item['subtotal_item']:,.0f}", border=1, align='R', ln=True)
+        
         subtotal_acumulado += item['subtotal_item']
-        resumen_items.append(f"{item['cantidad']} {item['tela']}")
+        # Formateamos la descripción para la columna D de Google Sheets
+        desc = f"{item['cantidad']}x {item['tela']} ({item['ancho']}x{item['largo']} {item['unit']}) {item['motor']}"
+        items_desc_nube.append(desc)
 
     pdf.ln(5)
     impuesto = subtotal_acumulado * 0.07
@@ -77,7 +76,7 @@ def crear_pdf(datos_cliente, lista_items):
     pdf.cell(150, 10, "TOTAL COTIZADO:", align='R')
     pdf.cell(40, 10, f"${total_gral:,.0f}", border=1, ln=True, align='R')
     
-    return pdf.output(dest='S').encode('latin-1'), subtotal_acumulado, impuesto, total_gral, " | ".join(resumen_items)
+    return pdf.output(dest='S').encode('latin-1'), total_gral, " | ".join(items_desc_nube)
 
 # --- CONFIGURACIÓN DE APP STREAMLIT ---
 st.set_page_config(page_title='Cotizaciones Persianas', layout="centered")
@@ -88,7 +87,6 @@ if 'n_folio' not in st.session_state:
 if 'carrito' not in st.session_state:
     st.session_state.carrito = []
 
-# Encabezado de Cliente y Folio
 col_head1, col_head2 = st.columns([2, 1])
 with col_head1:
     cliente = st.text_input("Nombre del Cliente", placeholder="Ej: Pablo Pérez")
@@ -98,7 +96,6 @@ with col_head2:
 
 st.divider()
 
-# Parámetros de la persiana
 usar_pulgadas = st.toggle("📐 Usar Pulgadas (in)", value=False)
 unidad = "in" if usar_pulgadas else "m"
 
@@ -112,7 +109,7 @@ with col2:
 
 cantidad = st.number_input("Cantidad de persianas", min_value=1, value=1)
 
-# Lógica de Cálculos (se mantiene tu fórmula original)
+# Lógica de Cálculos
 factor = 0.0254 if usar_pulgadas else 1.0
 a_m = ancho * factor
 l_m = largo * factor
@@ -137,37 +134,38 @@ if st.session_state.carrito:
     st.divider()
     st.subheader("🛒 Carrito de Cotización")
     
+    total_cantidad_carrito = 0
     for idx, it in enumerate(st.session_state.carrito):
         st.write(f"**{it['cantidad']}x** {it['tela']} ({it['ancho']}x{it['largo']} {it['unit']}) - ${it['subtotal_item']:,.0f}")
+        total_cantidad_carrito += it['cantidad']
 
-    if st.button("💾 Guardar en Historial y Generar PDF", use_container_width=True):
+    if st.button("💾 Guardar en Histórico y Generar PDF", use_container_width=True):
         datos_pdf = {
             "consecutivo": st.session_state.n_folio, 
             "fecha": datetime.now().strftime("%d/%m/%Y"), 
             "cliente": cliente if cliente else "Prospecto General"
         }
         
-        pdf_bytes, sub, imp, tot, res = crear_pdf(datos_pdf, st.session_state.carrito)
+        pdf_bytes, valor_total, descripcion_nube = crear_pdf(datos_pdf, st.session_state.carrito)
         
-        # Preparar datos para Google Sheets
+        # Datos organizados para el nuevo Apps Script (A:Folio, B:Fecha, C:Cliente, D:Descripción, E:Cantidad, F:Total)
         datos_registro = {
             "folio": st.session_state.n_folio,
             "fecha": datos_pdf["fecha"],
             "cliente": datos_pdf["cliente"],
-            "items": res,
-            "total": tot
+            "descripcion": descripcion_nube,
+            "cantidad": total_cantidad_carrito,
+            "total": valor_total
         }
 
-        # Registrar en la nube
-        with st.spinner("Registrando cotización en la nube..."):
+        with st.spinner("Registrando en la nube..."):
             if registrar_en_nube(datos_registro):
-                st.success(f"✅ Cotización #{st.session_state.n_folio} guardada en Google Sheets")
-                # Solo si se guardó con éxito, actualizamos el folio para la siguiente
+                st.success(f"✅ Cotización #{st.session_state.n_folio} guardada.")
                 st.session_state.n_folio += 1
+                st.session_state.carrito = [] # Limpiamos carrito tras guardar
             else:
-                st.error("❌ Error al guardar en la nube. Revisa tu conexión.")
+                st.error("❌ Error al guardar. Verifica la conexión.")
 
-        # Botón de descarga del PDF generado
         st.download_button(
             label="📩 Descargar PDF para enviar",
             data=pdf_bytes,

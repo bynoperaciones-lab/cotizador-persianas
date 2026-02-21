@@ -8,7 +8,7 @@ from datetime import datetime
 # --- CONFIGURACIÓN DE PÁGINA ---
 st.set_page_config(page_title="Persianas Steven", page_icon="🪟", layout="centered")
 
-# TU NUEVA URL ACTUALIZADA
+# URL DE TU ÚLTIMA IMPLEMENTACIÓN
 URL_APPSCRIPT = "https://script.google.com/macros/s/AKfycbzeA8z6WynVu_R6ZKLrB3Ss8r1xuoTNSsIqXGrjr4_8M4zKDikp-qHgywgDUcpSucz34w/exec"
 
 # --- FUNCIONES NUBE ---
@@ -37,7 +37,7 @@ def generar_pdf(n_folio, nombre_cliente, carrito, total):
     
     # Encabezados
     pdf.set_font("Arial", 'B', 10)
-    pdf.cell(100, 10, "Descripción", 1)
+    pdf.cell(100, 10, u"Descripción", 1)
     pdf.cell(30, 10, "Cant.", 1, align='C')
     pdf.cell(60, 10, "Subtotal", 1, ln=True, align='C')
     
@@ -69,29 +69,41 @@ st.write(f"Folio Actual: **#{st.session_state.n_folio}**")
 
 st.divider()
 
+# REINSTALACIÓN DE OPCIÓN PULGADAS
+usar_pulgadas = st.toggle("📐 Usar Pulgadas (in)", value=False, key="pulg")
+unidad = "in" if usar_pulgadas else "m"
+
 col1, col2 = st.columns(2)
 with col1:
-    ancho = st.number_input("Ancho (m)", min_value=0.0, step=0.01, format="%.2f", key="anc")
+    ancho = st.number_input(f"Ancho ({unidad})", min_value=0.0, step=0.01, format="%.2f", key="anc")
     tipo_tela = st.selectbox("Tipo de Tela", ["Seleccione...", "Blackout", "Screen", "Sheer Elegance"], key="tel")
 with col2:
-    largo = st.number_input("Largo (m)", min_value=0.0, step=0.01, format="%.2f", key="lar")
+    largo = st.number_input(f"Largo ({unidad})", min_value=0.0, step=0.01, format="%.2f", key="lar")
     motor = st.radio("Accionamiento", ["Manual", "Motorizada"], key="mot")
 
 cantidad = st.number_input("Cantidad", min_value=1, step=1, key="can")
 
-# Cálculos
+# LÓGICA DE CÁLCULOS CON CONVERSIÓN Y DESPERDICIO
 if ancho > 0 and largo > 0 and tipo_tela != "Seleccione...":
-    area_f = (ancho * largo) * 1.15
+    # Convertir a metros si es necesario (1 pulgada = 0.0254 metros)
+    factor = 0.0254 if usar_pulgadas else 1.0
+    ancho_m = ancho * factor
+    largo_m = largo * factor
+    
+    # Área con 15% de desperdicio
+    area_f = (ancho_m * largo_m) * 1.15
+    
     precios = {"Blackout": 48000, "Screen": 58000, "Sheer Elegance": 88000}
     p_unit = (area_f * precios[tipo_tela]) + (165000 if motor == "Motorizada" else 0)
     sub_total_item = p_unit * cantidad
     
-    st.info(f"Subtotal Ítem: ${sub_total_item:,.0f}")
+    st.info(f"Área facturable (con 15% desp.): {area_f:.2f} m²")
+    st.success(f"Subtotal Ítem: ${sub_total_item:,.0f}")
     
     if st.button("➕ Agregar Ítem al Carrito"):
         st.session_state.carrito.append({
             "cantidad": cantidad,
-            "descripcion": f"{tipo_tela} ({ancho}x{largo}m) {motor}",
+            "descripcion": f"{tipo_tela} ({ancho}x{largo}{unidad}) {motor}",
             "subtotal_item": sub_total_item
         })
         st.toast("Ítem añadido")
@@ -106,7 +118,7 @@ if st.session_state.carrito:
     total_neto = sum(i['subtotal_item'] for i in st.session_state.carrito)
     total_con_iva = total_neto * 1.07 
 
-    # BOTÓN PARA GENERAR Y DESCARGAR PDF
+    # PDF
     pdf_bytes = generar_pdf(st.session_state.n_folio, cliente, st.session_state.carrito, total_con_iva)
     st.download_button(
         label="📄 Descargar PDF de Cotización",
@@ -116,7 +128,7 @@ if st.session_state.carrito:
         use_container_width=True
     )
 
-    # BOTÓN FINAL
+    # REGISTRO Y LIMPIEZA
     if st.button("💾 REGISTRAR EN EXCEL Y LIMPIAR APP", use_container_width=True, type="primary"):
         datos_nube = {
             "folio": st.session_state.n_folio,
@@ -132,4 +144,4 @@ if st.session_state.carrito:
             st.session_state.n_folio = obtener_consecutivo()
             st.rerun()
         else:
-            st.error("❌ Error de comunicación.")
+            st.error("❌ Error de comunicación con la nube.")

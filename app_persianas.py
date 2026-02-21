@@ -22,7 +22,7 @@ def crear_pdf(datos_cliente, lista_items):
     pdf = FPDF()
     pdf.add_page()
     pdf.set_font("Arial", 'B', 20)
-    pdf.cell(200, 15, txt='Persianas "Empresa de Prueba"', ln=True, align='C')
+    pdf.cell(200, 15, txt='Persianas Steven', ln=True, align='C')
     pdf.ln(10)
     
     pdf.set_font("Arial", 'B', 12)
@@ -68,8 +68,8 @@ def crear_pdf(datos_cliente, lista_items):
     return pdf.output(dest='S').encode('latin-1'), subtotal_acumulado, impuesto, total_gral, " | ".join(resumen_items)
 
 # --- CONFIGURACIÓN DE APP ---
-st.set_page_config(page_title='Histórico de Cotizaciones', layout="centered")
-st.title('🪟 Persianas "Empresa de Prueba"')
+st.set_page_config(page_title='Cotizaciones Persianas', layout="centered")
+st.title('🪟 Persianas Steven')
 
 # Variable para el link de Google Sheets de Steven
 URL_HOJA = "" 
@@ -151,4 +151,5 @@ if st.session_state.carrito:
             mime="application/pdf"
         )
         
+
         actualizar_consecutivo(st.session_state.n_folio + 1)

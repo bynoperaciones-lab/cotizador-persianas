@@ -80,7 +80,7 @@ def crear_pdf(datos_cliente, lista_items):
 
 # --- CONFIGURACIÓN DE APP STREAMLIT ---
 st.set_page_config(page_title='Cotizaciones Persianas', layout="centered")
-st.title('🪟 Persianas Steven')
+st.title('\U0001FA9F Persianas Steven')
 
 if 'n_folio' not in st.session_state:
     st.session_state.n_folio = obtener_consecutivo()
@@ -172,4 +172,5 @@ if st.session_state.carrito:
             file_name=f"Cotizacion_{datos_pdf['consecutivo']}.pdf",
             mime="application/pdf"
         )
+
 

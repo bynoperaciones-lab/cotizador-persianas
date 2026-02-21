@@ -5,8 +5,9 @@ import requests
 import json
 from datetime import datetime
 
-# --- CONFIGURACIÓN DE PÁGINA (Debe ir de primero) ---
-st.set_page_config(page_title="Persianas Steven", page_icon="🪟", layout="centered")
+# --- CONFIGURACIÓN DE PÁGINA ---
+# Usamos el código hexadecimal de la ventana para el icono de la pestaña
+st.set_page_config(page_title="Persianas Steven", page_icon="&#129663;", layout="centered")
 
 # --- CONFIGURACIÓN DE TU INFRAESTRUCTURA ---
 URL_APPSCRIPT = "https://script.google.com/macros/s/AKfycbxIVWcaeWurbiWqjkXtwsgaez0GYakPmLJYdgkXY9pt5d9bSXEM14O_xfgP_GaFJzontQ/exec"
@@ -42,7 +43,6 @@ def crear_pdf(datos_cliente, lista_items):
     pdf.cell(200, 10, txt=f"Cliente: {datos_cliente['cliente']}", ln=True)
     pdf.ln(5)
 
-    # Encabezados de Tabla
     pdf.set_fill_color(230, 230, 230)
     pdf.set_font("Arial", 'B', 9)
     pdf.cell(12, 10, "Cant.", border=1, fill=True, align='C')
@@ -81,8 +81,9 @@ def crear_pdf(datos_cliente, lista_items):
     
     return pdf.output(dest='S').encode('latin-1'), total_gral, " | ".join(items_desc_nube)
 
-# --- TÍTULO DE LA APP ---
-st.markdown("# 🪟 Persianas Steven")
+# --- TÍTULO DE LA APP CON FIX PARA EL LOGO ---
+# Usamos st.write con HTML para que el navegador interprete el icono correctamente
+st.write("<h1>&#129663; Persianas Steven</h1>", unsafe_allow_html=True)
 
 if 'n_folio' not in st.session_state:
     st.session_state.n_folio = obtener_consecutivo()
@@ -111,7 +112,6 @@ with col2:
 
 cantidad = st.number_input("Cantidad de persianas", min_value=1, value=1)
 
-# Lógica de Cálculos
 factor = 0.0254 if usar_pulgadas else 1.0
 a_m = ancho * factor
 l_m = largo * factor
@@ -131,7 +131,6 @@ if st.button("➕ Agregar al carrito", use_container_width=True):
     })
     st.toast("Añadido al carrito")
 
-# --- RESUMEN Y ACCIÓN DE GUARDADO ---
 if st.session_state.carrito:
     st.divider()
     st.subheader("🛒 Carrito de Cotización")

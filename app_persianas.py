@@ -6,8 +6,7 @@ import json
 from datetime import datetime
 
 # --- CONFIGURACIÓN DE PÁGINA ---
-# Usamos el código hexadecimal de la ventana para el icono de la pestaña
-st.set_page_config(page_title="Persianas Steven", page_icon="&#129663;", layout="centered")
+st.set_page_config(page_title="Persianas Steven", page_icon="🪟", layout="centered")
 
 # --- CONFIGURACIÓN DE TU INFRAESTRUCTURA ---
 URL_APPSCRIPT = "https://script.google.com/macros/s/AKfycbxIVWcaeWurbiWqjkXtwsgaez0GYakPmLJYdgkXY9pt5d9bSXEM14O_xfgP_GaFJzontQ/exec"
@@ -81,9 +80,17 @@ def crear_pdf(datos_cliente, lista_items):
     
     return pdf.output(dest='S').encode('latin-1'), total_gral, " | ".join(items_desc_nube)
 
-# --- TÍTULO DE LA APP CON FIX PARA EL LOGO ---
-# Usamos st.write con HTML para que el navegador interprete el icono correctamente
-st.write("<h1>&#129663; Persianas Steven</h1>", unsafe_allow_html=True)
+# --- TÍTULO DE LA APP CON ICONO INVISIBLE A ERRORES ---
+st.markdown('<link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">', unsafe_allow_html=True)
+st.markdown(
+    """
+    <h1 style='display: flex; align-items: center;'>
+        <i class="material-icons" style="font-size: 45px; margin-right: 15px; color: #4F8BF9;">window</i>
+        Persianas Steven
+    </h1>
+    """, 
+    unsafe_allow_html=True
+)
 
 if 'n_folio' not in st.session_state:
     st.session_state.n_folio = obtener_consecutivo()

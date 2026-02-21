@@ -36,12 +36,14 @@ def generar_pdf_pro(n_folio, nombre_cliente, carrito):
     pdf.set_font("Arial", '', 12)
     pdf.cell(200, 10, txt=f"Cliente: {nombre_cliente}", ln=True)
     pdf.ln(5)
+    
     pdf.set_fill_color(230, 230, 230)
     pdf.set_font("Arial", 'B', 9)
     pdf.cell(12, 10, "Cant.", border=1, fill=True, align='C')
     pdf.cell(85, 10, u"Descripción", border=1, fill=True, align='C')
     pdf.cell(43, 10, "Precio Unit.", border=1, fill=True, align='C')
     pdf.cell(50, 10, "Subtotal", border=1, fill=True, align='C', ln=True)
+    
     pdf.set_font("Arial", size=9)
     subtotal_acumulado = 0
     for item in carrito:
@@ -50,9 +52,11 @@ def generar_pdf_pro(n_folio, nombre_cliente, carrito):
         pdf.cell(43, 10, f"${(item['subtotal_item']/item['cantidad']):,.0f}", border=1, align='R')
         pdf.cell(50, 10, f"${item['subtotal_item']:,.0f}", border=1, align='R', ln=True)
         subtotal_acumulado += item['subtotal_item']
+    
     pdf.ln(5)
     impuesto = subtotal_acumulado * 0.07
     total_gral = subtotal_acumulado + impuesto
+    
     pdf.set_font("Arial", 'B', 10)
     pdf.cell(140, 8, "SUBTOTAL:", align='R')
     pdf.cell(50, 8, f"${subtotal_acumulado:,.0f}", border=1, ln=True, align='R')
@@ -68,14 +72,13 @@ def generar_pdf_pro(n_folio, nombre_cliente, carrito):
 st.markdown('<link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">', unsafe_allow_html=True)
 st.markdown("<h1 style='display: flex; align-items: center;'><i class='material-icons' style='font-size: 45px; margin-right: 15px; color: #4F8BF9;'>window</i>Persianas Steven</h1>", unsafe_allow_html=True)
 
-# --- INICIALIZACIÓN DE ESTADO ---
+# --- ESTADO DE SESIÓN ---
 if 'n_folio' not in st.session_state:
     st.session_state.n_folio = obtener_consecutivo()
 if 'carrito' not in st.session_state:
     st.session_state.carrito = []
 
-# --- FORMULARIO CON LIMPIEZA AUTOMÁTICA ---
-# Al no definir un 'value' fijo y usar 'key', st.rerun() los pondrá en blanco
+# --- FORMULARIO ---
 cliente = st.text_input("Nombre del Cliente", placeholder="Ej: Pablo Pérez", key="cli")
 st.write(f"Folio Actual: **#{st.session_state.n_folio}**")
 
@@ -94,7 +97,7 @@ with col2:
 
 cantidad = st.number_input("Cantidad de persianas", min_value=1, step=1, key="can")
 
-# Lógica de Cálculos
+# Cálculos
 if ancho > 0 and largo > 0 and tipo_tela != "Seleccione...":
     factor = 0.0254 if usar_pulgadas else 1.0
     area_f = (ancho * factor * largo * factor) * 1.15
@@ -111,7 +114,13 @@ if ancho > 0 and largo > 0 and tipo_tela != "Seleccione...":
             "descripcion": f"{tipo_tela} ({ancho}x{largo}{unidad}) {motor}",
             "subtotal_item": sub_total_item
         })
-        st.toast("Ítem agregado")
+        # LIMPIEZA DE CAMPOS DE ÍTEM (resetea ancho, largo, tela, motor, cantidad)
+        st.session_state.anc = 0.0
+        st.session_state.lar = 0.0
+        st.session_state.tel = "Seleccione..."
+        st.session_state.can = 1
+        st.toast("Ítem añadido")
+        st.rerun()
 
 # --- ACCIONES FINALES ---
 if st.session_state.carrito:
@@ -123,14 +132,14 @@ if st.session_state.carrito:
     pdf_output, total_final = generar_pdf_pro(st.session_state.n_folio, cliente, st.session_state.carrito)
     
     st.download_button(
-        label="📩 Descargar PDF antes de guardar",
+        label="📩 Descargar PDF",
         data=pdf_output,
         file_name=f"Cotizacion_{st.session_state.n_folio}.pdf",
         mime="application/pdf",
         use_container_width=True
     )
 
-    if st.button("💾 REGISTRAR Y LIMPIAR PARA NUEVA COTIZACIÓN", use_container_width=True, type="primary"):
+    if st.button("💾 REGISTRAR Y LIMPIAR TODO", use_container_width=True, type="primary"):
         datos_nube = {
             "folio": st.session_state.n_folio,
             "fecha": datetime.now().strftime("%d/%m/%Y"),
@@ -140,10 +149,11 @@ if st.session_state.carrito:
         }
         
         if registrar_en_nube(datos_nube):
-            st.success("✅ Datos enviados. Reiniciando formulario...")
-            # Aquí ocurre la magia: vaciamos el carrito y forzamos el reinicio de la interfaz
+            st.success("✅ Datos enviados.")
+            # LIMPIEZA TOTAL (Carrito, Folio y Cliente)
             st.session_state.carrito = []
+            st.session_state.cli = ""
             st.session_state.n_folio = obtener_consecutivo()
-            st.rerun() # Esto borra todos los inputs de texto y números
+            st.rerun()
         else:
-            st.error("❌ Error de comunicación con la hoja de cálculo.")
+            st.error("❌ Error de comunicación.")

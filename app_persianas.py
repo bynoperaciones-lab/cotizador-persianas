@@ -9,17 +9,25 @@ import pandas as pd
 # --- CONFIGURACIÓN DE PÁGINA ---
 st.set_page_config(page_title="Persianas Steven", page_icon="🪟", layout="centered")
 
-# URL DE TU NUEVA IMPLEMENTACIÓN
+# URL DE TU IMPLEMENTACIÓN ACTUAL
 URL_APPSCRIPT = "https://script.google.com/macros/s/AKfycbxhHjthaZnGzWbsnyckIVSYPI31hq4os8tQXfNGngSbHZy8IhZ_lKfCZRc1tuSkrGcBg/exec"
 
-# --- FUNCIONES NUBE ---
+# --- FUNCIONES NUBE (CORREGIDA PARA EVITAR ERROR DE COMUNICACIÓN) ---
 def registrar_en_nube(datos):
     try:
-        response = requests.post(URL_APPSCRIPT, data=json.dumps(datos), timeout=10)
-        return response.status_code == 200
-    except: return False
+        # Enviamos con headers explícitos y un tiempo de espera más largo
+        response = requests.post(
+            URL_APPSCRIPT, 
+            data=json.dumps(datos), 
+            headers={'Content-Type': 'application/json'},
+            timeout=20 
+        )
+        # Verificamos si la respuesta fue exitosa (200) o si contiene el texto que envía el script
+        return response.status_code == 200 or "Éxito" in response.text
+    except: 
+        return False
 
-# --- FUNCIÓN PDF PROFESIONAL ---
+# --- FUNCIÓN PDF PROFESIONAL (CON U.M) ---
 def generar_pdf_pro(n_folio, nombre_cliente, carrito):
     pdf = FPDF()
     pdf.add_page()
@@ -35,7 +43,7 @@ def generar_pdf_pro(n_folio, nombre_cliente, carrito):
     
     pdf.set_fill_color(230, 230, 230)
     pdf.set_font("Arial", 'B', 9)
-    # Columnas PDF: Descripción, U.M, Precio Unit, Cant, Subtotal
+    # Columnas: Descripción, U.M, Precio Unit, Cant, Subtotal
     pdf.cell(80, 10, u"Descripcion", border=1, fill=True, align='C')
     pdf.cell(15, 10, "U.M", border=1, fill=True, align='C')
     pdf.cell(35, 10, "Precio Unit.", border=1, fill=True, align='C')
@@ -63,7 +71,7 @@ def generar_pdf_pro(n_folio, nombre_cliente, carrito):
 
 # --- ESTADO DE SESIÓN ---
 if 'n_folio' not in st.session_state:
-    st.session_state.n_folio = 1 # Empieza en 1 siempre
+    st.session_state.n_folio = 1 # Empieza siempre en 1
 if 'carrito' not in st.session_state:
     st.session_state.carrito = []
 if 'item_id' not in st.session_state:
@@ -71,7 +79,7 @@ if 'item_id' not in st.session_state:
 if 'cliente_limpio' not in st.session_state:
     st.session_state.cliente_limpio = 0
 
-# --- TÍTULO (CON VENTANITA) ---
+# --- TÍTULO ---
 st.markdown('<link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">', unsafe_allow_html=True)
 st.markdown("<h1 style='display: flex; align-items: center;'><i class='material-icons' style='font-size: 45px; margin-right: 15px; color: #4F8BF9;'>window</i>Persianas Steven</h1>", unsafe_allow_html=True)
 
@@ -149,11 +157,11 @@ if st.session_state.carrito:
             "items_detalle": st.session_state.carrito
         }
         if registrar_en_nube(datos_envio):
-            st.success("✅ ¡Registrado en Drive!")
+            st.success("✅ ¡Registro exitoso en Drive!")
             st.session_state.carrito = []
             st.session_state.cliente_limpio += 1
             st.session_state.item_id += 1 
             st.session_state.n_folio += 1 
             st.rerun()
         else:
-            st.error("❌ Error de comunicación con Drive.")
+            st.error("❌ Error de comunicación con Drive. Revisa que el Script esté publicado para 'Cualquiera'.")

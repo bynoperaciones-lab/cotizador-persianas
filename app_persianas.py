@@ -14,14 +14,16 @@ URL_APPSCRIPT = "https://script.google.com/macros/s/AKfycbzeA8z6WynVu_R6ZKLrB3Ss
 def obtener_consecutivo():
     try:
         response = requests.get(URL_APPSCRIPT, timeout=10)
-        # Si la respuesta es exitosa y hay un número, lo usamos. 
-        # Si la hoja está vacía, el Script de Google debería devolver 0, así que empezamos en 1.
         if response.status_code == 200:
-            val = int(response.text)
-            return val + 1 if val > 0 else 1
-        return 1 # Si falla la comunicación, empezamos en 1
+            content = response.text.strip()
+            # Si el contenido está vacío o no es un número válido, empezamos en 1
+            if not content or content == "" or content == "null":
+                return 1
+            val = int(content)
+            return val + 1 if val >= 1 else 1
+        return 1
     except: 
-        return 1 # Default al inicio absoluto
+        return 1 # Si hay error de conexión, por defecto empezamos en 1
 
 def registrar_en_nube(datos):
     try:
@@ -29,7 +31,7 @@ def registrar_en_nube(datos):
         return response.status_code == 200
     except: return False
 
-# --- FUNCIÓN PDF PROFESIONAL ---
+# --- FUNCIÓN PDF PROFESIONAL (SIN CAMBIOS ESTÉTICOS) ---
 def generar_pdf_pro(n_folio, nombre_cliente, carrito):
     pdf = FPDF()
     pdf.add_page()
@@ -40,6 +42,7 @@ def generar_pdf_pro(n_folio, nombre_cliente, carrito):
     pdf.cell(100, 10, txt=f"Cotizacion No: {n_folio}")
     pdf.cell(100, 10, txt=f"Fecha: {datetime.now().strftime('%d/%m/%Y')}", ln=True, align='R')
     pdf.set_font("Arial", '', 12)
+    # El nombre ya viene en mayúsculas desde el input
     pdf.cell(200, 10, txt=f"Cliente: {nombre_cliente}", ln=True)
     pdf.ln(5)
     
@@ -88,8 +91,11 @@ if 'cliente_limpio' not in st.session_state:
 st.markdown('<link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">', unsafe_allow_html=True)
 st.markdown("<h1 style='display: flex; align-items: center;'><i class='material-icons' style='font-size: 45px; margin-right: 15px; color: #4F8BF9;'>window</i>Persianas Steven</h1>", unsafe_allow_html=True)
 
-# --- CLIENTE (Se limpia solo al final) ---
-cliente = st.text_input("Nombre del Cliente", placeholder="Ej: Pablo Pérez", key=f"cli_{st.session_state.cliente_limpio}")
+# --- CLIENTE ---
+input_cliente = st.text_input("Nombre del Cliente", placeholder="Ej: Pablo Pérez", key=f"cli_{st.session_state.cliente_limpio}")
+# CONVERSIÓN AUTOMÁTICA A MAYÚSCULAS
+cliente = input_cliente.upper()
+
 st.write(f"Folio Actual: **#{st.session_state.n_folio}**")
 
 st.divider()
@@ -108,7 +114,7 @@ with col2:
 
 cantidad = st.number_input("Cantidad de persianas", min_value=1, step=1, key=f"can_{st.session_state.item_id}")
 
-# Cálculos
+# Lógica de Cálculos (Mantenida exactamente igual)
 if ancho > 0 and largo > 0 and tipo_tela != "Seleccione...":
     factor = 0.0254 if usar_pulgadas else 1.0
     area_f = (ancho * factor * largo * factor) * 1.15
@@ -150,7 +156,7 @@ if st.session_state.carrito:
         datos_nube = {
             "folio": st.session_state.n_folio,
             "fecha": datetime.now().strftime("%d/%m/%Y"),
-            "cliente": cliente if cliente else "Consumidor Final",
+            "cliente": cliente if cliente else "CONSUMIDOR FINAL",
             "items_detalle": st.session_state.carrito,
             "total_general": total_final
         }
@@ -160,8 +166,8 @@ if st.session_state.carrito:
             st.session_state.carrito = []
             st.session_state.cliente_limpio += 1
             st.session_state.item_id += 1 
-            # Recalcular folio inmediatamente para la siguiente
+            # Actualizamos folio para la siguiente
             st.session_state.n_folio = obtener_consecutivo()
             st.rerun()
         else:
-            st.error("❌ Error de comunicación.")
+            st.error("❌ Error de comunicación con la nube.")

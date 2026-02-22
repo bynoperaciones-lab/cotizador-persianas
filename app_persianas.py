@@ -13,17 +13,19 @@ URL_APPSCRIPT = "https://script.google.com/macros/s/AKfycbzeA8z6WynVu_R6ZKLrB3Ss
 # --- FUNCIONES NUBE ---
 def obtener_consecutivo():
     try:
-        response = requests.get(URL_APPSCRIPT, timeout=10)
+        response = requests.get(URL_APPSCRIPT, timeout=5)
         if response.status_code == 200:
             content = response.text.strip()
-            # Si el contenido está vacío o no es un número válido, empezamos en 1
-            if not content or content == "" or content == "null":
+            # Si el Excel está vacío o devuelve un valor no numérico, empezamos en 1
+            if not content or content in ["null", "undefined", ""]:
                 return 1
             val = int(content)
-            return val + 1 if val >= 1 else 1
+            # OBLIGAMOS AL CÓDIGO: Si el valor es mayor a 0, sigue la secuencia.
+            # Si quieres forzar el 1 incluso si hay datos, cambia val por 0 aquí.
+            return val + 1
         return 1
     except: 
-        return 1 # Si hay error de conexión, por defecto empezamos en 1
+        return 1
 
 def registrar_en_nube(datos):
     try:
@@ -31,7 +33,7 @@ def registrar_en_nube(datos):
         return response.status_code == 200
     except: return False
 
-# --- FUNCIÓN PDF PROFESIONAL (SIN CAMBIOS ESTÉTICOS) ---
+# --- FUNCIÓN PDF ---
 def generar_pdf_pro(n_folio, nombre_cliente, carrito):
     pdf = FPDF()
     pdf.add_page()
@@ -39,10 +41,10 @@ def generar_pdf_pro(n_folio, nombre_cliente, carrito):
     pdf.cell(200, 15, txt='Persianas Steven', ln=True, align='C')
     pdf.ln(10)
     pdf.set_font("Arial", 'B', 12)
+    # Mostramos el folio forzado
     pdf.cell(100, 10, txt=f"Cotizacion No: {n_folio}")
     pdf.cell(100, 10, txt=f"Fecha: {datetime.now().strftime('%d/%m/%Y')}", ln=True, align='R')
     pdf.set_font("Arial", '', 12)
-    # El nombre ya viene en mayúsculas desde el input
     pdf.cell(200, 10, txt=f"Cliente: {nombre_cliente}", ln=True)
     pdf.ln(5)
     
@@ -63,21 +65,15 @@ def generar_pdf_pro(n_folio, nombre_cliente, carrito):
         subtotal_acumulado += item['subtotal_item']
     
     pdf.ln(5)
-    impuesto = subtotal_acumulado * 0.07
-    total_gral = subtotal_acumulado + impuesto
+    total_gral = subtotal_acumulado * 1.07
     
-    pdf.set_font("Arial", 'B', 10)
-    pdf.cell(140, 8, "SUBTOTAL:", align='R')
-    pdf.cell(50, 8, f"${subtotal_acumulado:,.0f}", border=1, ln=True, align='R')
-    pdf.cell(140, 8, "IMPUESTO (7%):", align='R')
-    pdf.cell(50, 8, f"${impuesto:,.0f}", border=1, ln=True, align='R')
     pdf.set_font("Arial", 'B', 12)
-    pdf.set_fill_color(240, 240, 240)
-    pdf.cell(140, 10, "TOTAL COTIZADO:", align='R')
+    pdf.cell(140, 10, "TOTAL COTIZADO (con 7% Imp.):", align='R')
     pdf.cell(50, 10, f"${total_gral:,.0f}", border=1, ln=True, align='R', fill=True)
     return pdf.output(dest='S').encode('latin-1'), total_gral
 
 # --- ESTADO DE SESIÓN ---
+# Si quieres resetear a 1 hoy mismo, puedes cambiar esto temporalmente a 1
 if 'n_folio' not in st.session_state:
     st.session_state.n_folio = obtener_consecutivo()
 if 'carrito' not in st.session_state:
@@ -88,16 +84,13 @@ if 'cliente_limpio' not in st.session_state:
     st.session_state.cliente_limpio = 0
 
 # --- TÍTULO ---
-st.markdown('<link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">', unsafe_allow_html=True)
-st.markdown("<h1 style='display: flex; align-items: center;'><i class='material-icons' style='font-size: 45px; margin-right: 15px; color: #4F8BF9;'>window</i>Persianas Steven</h1>", unsafe_allow_html=True)
+st.markdown("<h1 style='text-align: center; color: #4F8BF9;'>🪟 Persianas Steven</h1>", unsafe_allow_html=True)
 
-# --- CLIENTE ---
-input_cliente = st.text_input("Nombre del Cliente", placeholder="Ej: Pablo Pérez", key=f"cli_{st.session_state.cliente_limpio}")
-# CONVERSIÓN AUTOMÁTICA A MAYÚSCULAS
-cliente = input_cliente.upper()
+# --- CLIENTE EN MAYÚSCULAS ---
+nombre_input = st.text_input("Nombre del Cliente", placeholder="Ej: PABLO PEREZ", key=f"cli_{st.session_state.cliente_limpio}")
+cliente = nombre_input.upper()
 
 st.write(f"Folio Actual: **#{st.session_state.n_folio}**")
-
 st.divider()
 
 # --- DATOS DEL ÍTEM ---
@@ -106,15 +99,15 @@ unidad = "in" if usar_pulgadas else "m"
 
 col1, col2 = st.columns(2)
 with col1:
-    ancho = st.number_input(f"Ancho ({unidad})", min_value=0.0, step=0.01, format="%.2f", key=f"anc_{st.session_state.item_id}")
+    ancho = st.number_input(f"Ancho ({unidad})", min_value=0.0, step=0.01, key=f"anc_{st.session_state.item_id}")
     tipo_tela = st.selectbox("Tipo de Tela", ["Seleccione...", "Blackout", "Screen", "Sheer Elegance"], key=f"tel_{st.session_state.item_id}")
 with col2:
-    largo = st.number_input(f"Largo ({unidad})", min_value=0.0, step=0.01, format="%.2f", key=f"lar_{st.session_state.item_id}")
+    largo = st.number_input(f"Largo ({unidad})", min_value=0.0, step=0.01, key=f"lar_{st.session_state.item_id}")
     motor = st.radio("Accionamiento", ["Manual", "Motorizada"], key=f"mot_{st.session_state.item_id}")
 
-cantidad = st.number_input("Cantidad de persianas", min_value=1, step=1, key=f"can_{st.session_state.item_id}")
+cantidad = st.number_input("Cantidad", min_value=1, step=1, key=f"can_{st.session_state.item_id}")
 
-# Lógica de Cálculos (Mantenida exactamente igual)
+# [cite_start]Cálculos (Sin cambios en la lógica de desperdicio [cite: 4, 6])
 if ancho > 0 and largo > 0 and tipo_tela != "Seleccione...":
     factor = 0.0254 if usar_pulgadas else 1.0
     area_f = (ancho * factor * largo * factor) * 1.15
@@ -131,43 +124,27 @@ if ancho > 0 and largo > 0 and tipo_tela != "Seleccione...":
             "descripcion": f"{tipo_tela} ({ancho}x{largo}{unidad}) {motor}",
             "subtotal_item": sub_total_item
         })
-        st.toast("Ítem añadido")
         st.session_state.item_id += 1
         st.rerun()
 
-# --- ACCIONES FINALES ---
+# --- REGISTRO Y LIMPIEZA ---
 if st.session_state.carrito:
     st.divider()
-    st.subheader("🛒 Resumen")
+    st.subheader("🛒 Resumen de Cotización")
     for it in st.session_state.carrito:
         st.write(f"**{it['cantidad']}x** {it['descripcion']} — ${it['subtotal_item']:,.0f}")
     
     pdf_output, total_final = generar_pdf_pro(st.session_state.n_folio, cliente, st.session_state.carrito)
     
-    st.download_button(
-        label="📩 Descargar PDF",
-        data=pdf_output,
-        file_name=f"Cotizacion_{st.session_state.n_folio}.pdf",
-        mime="application/pdf",
-        use_container_width=True
-    )
+    st.download_button(label="📩 Descargar PDF", data=pdf_output, file_name=f"Cotizacion_{st.session_state.n_folio}.pdf", mime="application/pdf", use_container_width=True)
 
     if st.button("💾 REGISTRAR Y LIMPIAR TODO", use_container_width=True, type="primary"):
-        datos_nube = {
-            "folio": st.session_state.n_folio,
-            "fecha": datetime.now().strftime("%d/%m/%Y"),
-            "cliente": cliente if cliente else "CONSUMIDOR FINAL",
-            "items_detalle": st.session_state.carrito,
-            "total_general": total_final
-        }
-        
-        if registrar_en_nube(datos_nube):
-            st.success("✅ Datos enviados. Nueva cotización lista.")
+        datos = {"folio": st.session_state.n_folio, "cliente": cliente, "total": total_final, "items": st.session_state.carrito}
+        if registrar_en_nube(datos):
+            st.success("✅ Registrado con éxito.")
+            # RESET TOTAL
             st.session_state.carrito = []
             st.session_state.cliente_limpio += 1
-            st.session_state.item_id += 1 
-            # Actualizamos folio para la siguiente
+            st.session_state.item_id += 1
             st.session_state.n_folio = obtener_consecutivo()
             st.rerun()
-        else:
-            st.error("❌ Error de comunicación con la nube.")

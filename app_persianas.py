@@ -9,19 +9,16 @@ import pandas as pd
 # --- CONFIGURACIÓN DE PÁGINA ---
 st.set_page_config(page_title="Persianas Steven", page_icon="🪟", layout="centered")
 
-# URL ACTUALIZADA CON TU NUEVO ID
+# TU URL DE APPSCRIPT
 URL_APPSCRIPT = "https://script.google.com/macros/s/AKfycbzqJThC_lLO8Rf5vuVlJ59Cf-oB8bgjZ9P8A9rldlyI7khYNqGfOLx17YCF957ZXVnlEw/exec"
 
 # --- FUNCIONES NUBE ---
 def registrar_en_nube(datos):
     try:
-        # Usamos allow_redirects=True para que Google procese el POST correctamente
-        response = requests.post(URL_APPSCRIPT, data=json.dumps(datos), timeout=15, allow_redirects=True)
-        # Verificamos si Google respondió con éxito
-        return "Éxito" in response.text or response.status_code == 200
-    except Exception as e:
-        st.error(f"Error de conexión: {e}")
-        return False
+        response = requests.post(URL_APPSCRIPT, data=json.dumps(datos), timeout=10)
+        # Volvemos a tu validación original que sí funcionaba
+        return response.status_code == 200
+    except: return False
 
 # --- FUNCIÓN PDF PROFESIONAL (CON COLUMNA U.M) ---
 def generar_pdf_pro(n_folio, nombre_cliente, carrito):
@@ -39,7 +36,7 @@ def generar_pdf_pro(n_folio, nombre_cliente, carrito):
     
     pdf.set_fill_color(230, 230, 230)
     pdf.set_font("Arial", 'B', 9)
-    # Reorden de encabezados: Descripcion, U.M, Precio Unit, Cant, Subtotal
+    # Encabezados: Descripcion, U.M, Precio Unit, Cant, Subtotal
     pdf.cell(80, 10, u"Descripcion", border=1, fill=True, align='C')
     pdf.cell(15, 10, "U.M", border=1, fill=True, align='C')
     pdf.cell(35, 10, "Precio Unit.", border=1, fill=True, align='C')
@@ -132,10 +129,9 @@ if st.session_state.carrito:
     st.divider()
     st.subheader("🛒 Resumen de Cotización")
     df_resumen = pd.DataFrame(st.session_state.carrito)
-    total_cot_sin_iva = df_resumen['subtotal_item'].sum()
-    total_cot_con_iva = total_cot_sin_iva * 1.07
+    total_cot_con_iva = df_resumen['subtotal_item'].sum() * 1.07
     
-    # Construcción de tabla de visualización
+    # Tabla de visualización (8 columnas)
     df_mostrar = pd.DataFrame()
     df_mostrar['Folio'] = [st.session_state.n_folio] * len(df_resumen)
     df_mostrar['Fecha'] = datetime.now().strftime("%d/%m/%Y")
@@ -168,4 +164,4 @@ if st.session_state.carrito:
             st.session_state.n_folio += 1 
             st.rerun()
         else:
-            st.error("❌ Error al registrar en la nube. Revisa los permisos en AppScript.")
+            st.error("❌ Error al registrar en la nube.")

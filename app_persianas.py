@@ -9,28 +9,17 @@ import pandas as pd
 # --- CONFIGURACIÓN DE PÁGINA ---
 st.set_page_config(page_title="Persianas Steven", page_icon="🪟", layout="centered")
 
-URL_APPSCRIPT = "https://script.google.com/macros/s/AKfycbzeA8z6WynVu_R6ZKLrB3Ss8r1xuoTNSsIqXGrjr4_8M4zKDikp-qHgywgDUcpSucz34w/exec"
+# URL DE TU NUEVA IMPLEMENTACIÓN
+URL_APPSCRIPT = "https://script.google.com/macros/s/AKfycbxhHjthaZnGzWbsnyckIVSYPI31hq4os8tQXfNGngSbHZy8IhZ_lKfCZRc1tuSkrGcBg/exec"
 
 # --- FUNCIONES NUBE ---
-def obtener_consecutivo():
-    try:
-        response = requests.get(URL_APPSCRIPT, timeout=10)
-        if response.status_code == 200:
-            content = response.text.strip()
-            if not content or content in ["null", "undefined", ""]:
-                return 1
-            val = int(content)
-            return val + 1 if val >= 0 else 1
-        return 1
-    except: return 1
-
 def registrar_en_nube(datos):
     try:
         response = requests.post(URL_APPSCRIPT, data=json.dumps(datos), timeout=10)
         return response.status_code == 200
     except: return False
 
-# --- FUNCIÓN PDF PROFESIONAL (ACTUALIZADA CON U.M) ---
+# --- FUNCIÓN PDF PROFESIONAL ---
 def generar_pdf_pro(n_folio, nombre_cliente, carrito):
     pdf = FPDF()
     pdf.add_page()
@@ -46,7 +35,7 @@ def generar_pdf_pro(n_folio, nombre_cliente, carrito):
     
     pdf.set_fill_color(230, 230, 230)
     pdf.set_font("Arial", 'B', 9)
-    # Columnas: Descripción (80), U.M (15), Precio Unit (35), Cant (15), Subtotal (45)
+    # Columnas PDF: Descripción, U.M, Precio Unit, Cant, Subtotal
     pdf.cell(80, 10, u"Descripcion", border=1, fill=True, align='C')
     pdf.cell(15, 10, "U.M", border=1, fill=True, align='C')
     pdf.cell(35, 10, "Precio Unit.", border=1, fill=True, align='C')
@@ -56,10 +45,9 @@ def generar_pdf_pro(n_folio, nombre_cliente, carrito):
     pdf.set_font("Arial", size=9)
     subtotal_acumulado = 0
     for item in carrito:
-        precio_u = item['valor_item']
         pdf.cell(80, 10, item['descripcion'], border=1)
         pdf.cell(15, 10, item['unidad'], border=1, align='C')
-        pdf.cell(35, 10, f"${precio_u:,.0f}", border=1, align='R')
+        pdf.cell(35, 10, f"${item['valor_item']:,.0f}", border=1, align='R')
         pdf.cell(15, 10, str(item['cantidad']), border=1, align='C')
         pdf.cell(45, 10, f"${item['subtotal_item']:,.0f}", border=1, align='R', ln=True)
         subtotal_acumulado += item['subtotal_item']
@@ -67,7 +55,6 @@ def generar_pdf_pro(n_folio, nombre_cliente, carrito):
     pdf.ln(5)
     impuesto = subtotal_acumulado * 0.07
     total_gral = subtotal_acumulado + impuesto
-    
     pdf.set_font("Arial", 'B', 12)
     pdf.set_fill_color(240, 240, 240)
     pdf.cell(145, 10, "TOTAL COTIZADO (con 7% Imp.):", align='R')
@@ -76,7 +63,7 @@ def generar_pdf_pro(n_folio, nombre_cliente, carrito):
 
 # --- ESTADO DE SESIÓN ---
 if 'n_folio' not in st.session_state:
-    st.session_state.n_folio = obtener_consecutivo()
+    st.session_state.n_folio = 1 # Empieza en 1 siempre
 if 'carrito' not in st.session_state:
     st.session_state.carrito = []
 if 'item_id' not in st.session_state:
@@ -84,14 +71,13 @@ if 'item_id' not in st.session_state:
 if 'cliente_limpio' not in st.session_state:
     st.session_state.cliente_limpio = 0
 
-# --- TÍTULO ---
+# --- TÍTULO (CON VENTANITA) ---
 st.markdown('<link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">', unsafe_allow_html=True)
 st.markdown("<h1 style='display: flex; align-items: center;'><i class='material-icons' style='font-size: 45px; margin-right: 15px; color: #4F8BF9;'>window</i>Persianas Steven</h1>", unsafe_allow_html=True)
 
 # --- CLIENTE ---
-input_cliente = st.text_input("Nombre del Cliente", placeholder="Ej: PABLO PEREZ", key=f"cli_{st.session_state.cliente_limpio}")
+input_cliente = st.text_input("Nombre del Cliente", placeholder="EJ: JUAN PEREZ", key=f"cli_{st.session_state.cliente_limpio}")
 cliente = input_cliente.upper()
-
 st.write(f"Folio Actual: **#{st.session_state.n_folio}**")
 st.divider()
 
@@ -114,7 +100,6 @@ if ancho > 0 and largo > 0 and tipo_tela != "Seleccione...":
     area_visual = (ancho * largo) * 1.15
     factor_m = 0.0254 if usar_pulgadas else 1.0
     area_m2 = (ancho * factor_m * largo * factor_m) * 1.15
-    
     precios = {"Blackout": 48000, "Screen": 58000, "Sheer Elegance": 88000}
     p_unit = (area_m2 * precios[tipo_tela]) + (165000 if motor == "Motorizada" else 0)
     sub_total_item = p_unit * cantidad
@@ -124,7 +109,6 @@ if ancho > 0 and largo > 0 and tipo_tela != "Seleccione...":
     
     if st.button("➕ Agregar al carrito"):
         st.session_state.carrito.append({
-            "fecha": datetime.now().strftime("%d/%m/%Y"),
             "descripcion": f"{tipo_tela} ({ancho}x{largo})",
             "unidad": unidad,
             "cantidad": cantidad,
@@ -139,24 +123,21 @@ if ancho > 0 and largo > 0 and tipo_tela != "Seleccione...":
 if st.session_state.carrito:
     st.divider()
     st.subheader("🛒 Resumen")
-    
     df_resumen = pd.DataFrame(st.session_state.carrito)
     total_cotizacion = df_resumen['subtotal_item'].sum() * 1.07
     
     df_mostrar = pd.DataFrame()
     df_mostrar['Folio'] = [st.session_state.n_folio] * len(df_resumen)
-    df_mostrar['Fecha'] = df_resumen['fecha']
-    df_mostrar['Cliente'] = [cliente] * len(df_resumen)
+    df_mostrar['Fecha'] = datetime.now().strftime("%d/%m/%Y")
+    df_mostrar['Cliente'] = cliente
     df_mostrar['Descripción'] = df_resumen['descripcion']
     df_mostrar['U.M'] = df_resumen['unidad']
     df_mostrar['Cantidad'] = df_resumen['cantidad']
     df_mostrar['Valor ítem'] = df_resumen['valor_item'].map('${:,.0f}'.format)
     df_mostrar['Total cotización'] = f"${total_cotizacion:,.0f}"
-    
     st.table(df_mostrar)
     
     pdf_output, total_final = generar_pdf_pro(st.session_state.n_folio, cliente, st.session_state.carrito)
-    
     st.download_button(label="📩 Descargar PDF", data=pdf_output, file_name=f"Cotizacion_{st.session_state.n_folio}.pdf", mime="application/pdf", use_container_width=True)
 
     if st.button("💾 REGISTRAR Y LIMPIAR TODO", use_container_width=True, type="primary"):
@@ -167,13 +148,12 @@ if st.session_state.carrito:
             "total_general": total_final,
             "items_detalle": st.session_state.carrito
         }
-        
         if registrar_en_nube(datos_envio):
-            st.success("✅ ¡Registrado con éxito!")
+            st.success("✅ ¡Registrado en Drive!")
             st.session_state.carrito = []
             st.session_state.cliente_limpio += 1
             st.session_state.item_id += 1 
-            st.session_state.n_folio = obtener_consecutivo()
+            st.session_state.n_folio += 1 
             st.rerun()
         else:
-            st.error("❌ Error de comunicación.")
+            st.error("❌ Error de comunicación con Drive.")

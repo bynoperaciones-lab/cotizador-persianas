@@ -34,7 +34,6 @@ def generar_pdf_pro(n_folio, nombre_cliente, carrito):
     
     pdf.set_fill_color(230, 230, 230)
     pdf.set_font("Arial", 'B', 9)
-    # Encabezados con U.M: Descripcion, U.M, Precio Unit, Cant, Subtotal
     pdf.cell(80, 10, u"Descripcion", border=1, fill=True, align='C')
     pdf.cell(15, 10, "U.M", border=1, fill=True, align='C')
     pdf.cell(35, 10, "Precio Unit.", border=1, fill=True, align='C')
@@ -44,10 +43,9 @@ def generar_pdf_pro(n_folio, nombre_cliente, carrito):
     pdf.set_font("Arial", size=9)
     subtotal_acumulado = 0
     for item in carrito:
-        precio_u = item['valor_item']
         pdf.cell(80, 10, item['descripcion'], border=1)
-        pdf.cell(15, 10, item['unidad'], border=1, align='C') # Nueva columna PDF
-        pdf.cell(35, 10, f"${precio_u:,.0f}", border=1, align='R')
+        pdf.cell(15, 10, item['unidad'], border=1, align='C')
+        pdf.cell(35, 10, f"${item['valor_item']:,.0f}", border=1, align='R')
         pdf.cell(15, 10, str(item['cantidad']), border=1, align='C')
         pdf.cell(45, 10, f"${item['subtotal_item']:,.0f}", border=1, align='R', ln=True)
         subtotal_acumulado += item['subtotal_item']
@@ -56,11 +54,6 @@ def generar_pdf_pro(n_folio, nombre_cliente, carrito):
     impuesto = subtotal_acumulado * 0.07
     total_gral = subtotal_acumulado + impuesto
     
-    pdf.set_font("Arial", 'B', 10)
-    pdf.cell(145, 8, "SUBTOTAL:", align='R')
-    pdf.cell(45, 8, f"${subtotal_acumulado:,.0f}", border=1, ln=True, align='R')
-    pdf.cell(145, 8, "IMPUESTO (7%):", align='R')
-    pdf.cell(45, 8, f"${impuesto:,.0f}", border=1, ln=True, align='R')
     pdf.set_font("Arial", 'B', 12)
     pdf.set_fill_color(240, 240, 240)
     pdf.cell(145, 10, "TOTAL COTIZADO:", align='R')
@@ -118,7 +111,7 @@ if ancho > 0 and largo > 0 and tipo_tela != "Seleccione...":
             "fecha": datetime.now().strftime("%d/%m/%Y"),
             "cliente": cliente,
             "descripcion": f"{tipo_tela} ({ancho}x{largo}{unidad_medida}) {motor}",
-            "unidad": unidad_medida, # Nuevo campo
+            "unidad": unidad_medida,
             "cantidad": cantidad,
             "valor_item": p_unit,
             "subtotal_item": sub_total_item
@@ -134,15 +127,17 @@ if st.session_state.carrito:
     df_resumen = pd.DataFrame(st.session_state.carrito)
     total_acumulado = df_resumen['subtotal_item'].sum() * 1.07
     
-    # Preparamos la tabla para mostrar (incluyendo U.M)
-    df_mostrar = df_resumen[[
-        'folio', 'fecha', 'cliente', 'descripcion', 'unidad', 'cantidad', 'valor_item', 'Total cotización' if 'Total cotización' in df_resumen else 'folio'
-    ]].copy()
-    
+    # CONSTRUCCIÓN EXPLÍCITA PARA EVITAR VALUEERROR
+    df_mostrar = pd.DataFrame()
+    df_mostrar['Folio'] = df_resumen['folio']
+    df_mostrar['Fecha'] = df_resumen['fecha']
+    df_mostrar['Cliente'] = df_resumen['cliente']
+    df_mostrar['Descripción'] = df_resumen['descripcion']
+    df_mostrar['U.M'] = df_resumen['unidad']
+    df_mostrar['Cantidad'] = df_resumen['cantidad']
+    df_mostrar['Valor ítem'] = df_resumen['valor_item'].map('${:,.0f}'.format)
     df_mostrar['Total cotización'] = f"${total_acumulado:,.0f}"
-    df_mostrar.columns = ['Folio', 'Fecha', 'Cliente', 'Descripción', 'U.M', 'Cantidad', 'Valor ítem', 'Total cotización']
     
-    df_mostrar['Valor ítem'] = df_mostrar['Valor ítem'].map('${:,.0f}'.format)
     st.table(df_mostrar)
     
     pdf_output, total_final = generar_pdf_pro(st.session_state.n_folio, cliente, st.session_state.carrito)

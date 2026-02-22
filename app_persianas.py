@@ -9,8 +9,7 @@ import pandas as pd
 # --- CONFIGURACIÓN DE PÁGINA ---
 st.set_page_config(page_title="Persianas Steven", page_icon="🪟", layout="centered")
 
-# NUEVA URL DE IMPLEMENTACIÓN
-URL_APPSCRIPT = "https://script.google.com/macros/s/AKfycbw4Fg9yOvgAwLeyHgvdq_0MPmfs5uu2gETRY0brCChE0iW7yItf2ecZHGST6LhWHC1GEg/exec"
+URL_APPSCRIPT = "https://script.google.com/macros/s/AKfycbzeA8z6WynVu_R6ZKLrB3Ss8r1xuoTNSsIqXGrjr4_8M4zKDikp-qHgywgDUcpSucz34w/exec"
 
 # --- FUNCIONES NUBE ---
 def obtener_consecutivo():
@@ -31,7 +30,7 @@ def registrar_en_nube(datos):
         return response.status_code == 200
     except: return False
 
-# --- FUNCIÓN PDF PROFESIONAL ---
+# --- FUNCIÓN PDF PROFESIONAL (ACTUALIZADA CON U.M) ---
 def generar_pdf_pro(n_folio, nombre_cliente, carrito):
     pdf = FPDF()
     pdf.add_page()
@@ -47,20 +46,22 @@ def generar_pdf_pro(n_folio, nombre_cliente, carrito):
     
     pdf.set_fill_color(230, 230, 230)
     pdf.set_font("Arial", 'B', 9)
-    # Orden solicitado: Descripción, Precio Unit, Cant, Subtotal
-    pdf.cell(90, 10, u"Descripcion", border=1, fill=True, align='C')
+    # Columnas: Descripción (80), U.M (15), Precio Unit (35), Cant (15), Subtotal (45)
+    pdf.cell(80, 10, u"Descripcion", border=1, fill=True, align='C')
+    pdf.cell(15, 10, "U.M", border=1, fill=True, align='C')
     pdf.cell(35, 10, "Precio Unit.", border=1, fill=True, align='C')
     pdf.cell(15, 10, "Cant.", border=1, fill=True, align='C')
-    pdf.cell(50, 10, "Subtotal", border=1, fill=True, align='C', ln=True)
+    pdf.cell(45, 10, "Subtotal", border=1, fill=True, align='C', ln=True)
     
     pdf.set_font("Arial", size=9)
     subtotal_acumulado = 0
     for item in carrito:
         precio_u = item['valor_item']
-        pdf.cell(90, 10, f"{item['descripcion']} ({item['unidad']})", border=1)
+        pdf.cell(80, 10, item['descripcion'], border=1)
+        pdf.cell(15, 10, item['unidad'], border=1, align='C')
         pdf.cell(35, 10, f"${precio_u:,.0f}", border=1, align='R')
         pdf.cell(15, 10, str(item['cantidad']), border=1, align='C')
-        pdf.cell(50, 10, f"${item['subtotal_item']:,.0f}", border=1, align='R', ln=True)
+        pdf.cell(45, 10, f"${item['subtotal_item']:,.0f}", border=1, align='R', ln=True)
         subtotal_acumulado += item['subtotal_item']
     
     pdf.ln(5)
@@ -69,8 +70,8 @@ def generar_pdf_pro(n_folio, nombre_cliente, carrito):
     
     pdf.set_font("Arial", 'B', 12)
     pdf.set_fill_color(240, 240, 240)
-    pdf.cell(140, 10, "TOTAL COTIZADO (con 7% Imp.):", align='R')
-    pdf.cell(50, 10, f"${total_gral:,.0f}", border=1, ln=True, align='R', fill=True)
+    pdf.cell(145, 10, "TOTAL COTIZADO (con 7% Imp.):", align='R')
+    pdf.cell(45, 10, f"${total_gral:,.0f}", border=1, ln=True, align='R', fill=True)
     return pdf.output(dest='S').encode('latin-1'), total_gral
 
 # --- ESTADO DE SESIÓN ---
@@ -142,7 +143,6 @@ if st.session_state.carrito:
     df_resumen = pd.DataFrame(st.session_state.carrito)
     total_cotizacion = df_resumen['subtotal_item'].sum() * 1.07
     
-    # Crear la vista para la tabla con el orden solicitado
     df_mostrar = pd.DataFrame()
     df_mostrar['Folio'] = [st.session_state.n_folio] * len(df_resumen)
     df_mostrar['Fecha'] = df_resumen['fecha']
@@ -160,7 +160,6 @@ if st.session_state.carrito:
     st.download_button(label="📩 Descargar PDF", data=pdf_output, file_name=f"Cotizacion_{st.session_state.n_folio}.pdf", mime="application/pdf", use_container_width=True)
 
     if st.button("💾 REGISTRAR Y LIMPIAR TODO", use_container_width=True, type="primary"):
-        # Estructura exacta para el Apps Script
         datos_envio = {
             "folio": st.session_state.n_folio,
             "fecha": datetime.now().strftime("%d/%m/%Y"),

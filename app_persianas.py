@@ -14,8 +14,14 @@ URL_APPSCRIPT = "https://script.google.com/macros/s/AKfycbzeA8z6WynVu_R6ZKLrB3Ss
 def obtener_consecutivo():
     try:
         response = requests.get(URL_APPSCRIPT, timeout=10)
-        return int(response.text) + 1 if response.status_code == 200 else 100
-    except: return 100
+        # Si la respuesta es exitosa y hay un número, lo usamos. 
+        # Si la hoja está vacía, el Script de Google debería devolver 0, así que empezamos en 1.
+        if response.status_code == 200:
+            val = int(response.text)
+            return val + 1 if val > 0 else 1
+        return 1 # Si falla la comunicación, empezamos en 1
+    except: 
+        return 1 # Default al inicio absoluto
 
 def registrar_en_nube(datos):
     try:
@@ -88,7 +94,7 @@ st.write(f"Folio Actual: **#{st.session_state.n_folio}**")
 
 st.divider()
 
-# --- DATOS DEL ÍTEM (Se limpia cada vez que agregas al carrito) ---
+# --- DATOS DEL ÍTEM ---
 usar_pulgadas = st.toggle("📐 Usar Pulgadas (in)", value=False, key=f"pulg_{st.session_state.item_id}")
 unidad = "in" if usar_pulgadas else "m"
 
@@ -120,7 +126,6 @@ if ancho > 0 and largo > 0 and tipo_tela != "Seleccione...":
             "subtotal_item": sub_total_item
         })
         st.toast("Ítem añadido")
-        # Cambiamos solo el ID de los ítems para limpiar medidas, pero dejamos el cliente igual
         st.session_state.item_id += 1
         st.rerun()
 
@@ -152,12 +157,11 @@ if st.session_state.carrito:
         
         if registrar_en_nube(datos_nube):
             st.success("✅ Datos enviados. Nueva cotización lista.")
-            # Reiniciamos todo
             st.session_state.carrito = []
-            st.session_state.n_folio = obtener_consecutivo()
-            # Al cambiar este ID, ahora sí se borra el nombre del cliente
             st.session_state.cliente_limpio += 1
             st.session_state.item_id += 1 
+            # Recalcular folio inmediatamente para la siguiente
+            st.session_state.n_folio = obtener_consecutivo()
             st.rerun()
         else:
             st.error("❌ Error de comunicación.")

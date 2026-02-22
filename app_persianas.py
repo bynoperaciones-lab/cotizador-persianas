@@ -9,14 +9,19 @@ import pandas as pd
 # --- CONFIGURACIÓN DE PÁGINA ---
 st.set_page_config(page_title="Persianas Steven", page_icon="🪟", layout="centered")
 
-URL_APPSCRIPT = "https://script.google.com/macros/s/AKfycbxhHjthaZnGzWbsnyckIVSYPI31hq4os8tQXfNGngSbHZy8IhZ_lKfCZRc1tuSkrGcBg/exec"
+# URL ACTUALIZADA CON TU NUEVO ID
+URL_APPSCRIPT = "https://script.google.com/macros/s/AKfycbzqJThC_lLO8Rf5vuVlJ59Cf-oB8bgjZ9P8A9rldlyI7khYNqGfOLx17YCF957ZXVnlEw/exec"
 
 # --- FUNCIONES NUBE ---
 def registrar_en_nube(datos):
     try:
-        response = requests.post(URL_APPSCRIPT, data=json.dumps(datos), timeout=10)
-        return response.status_code == 200
-    except: return False
+        # Usamos allow_redirects=True para que Google procese el POST correctamente
+        response = requests.post(URL_APPSCRIPT, data=json.dumps(datos), timeout=15, allow_redirects=True)
+        # Verificamos si Google respondió con éxito
+        return "Éxito" in response.text or response.status_code == 200
+    except Exception as e:
+        st.error(f"Error de conexión: {e}")
+        return False
 
 # --- FUNCIÓN PDF PROFESIONAL (CON COLUMNA U.M) ---
 def generar_pdf_pro(n_folio, nombre_cliente, carrito):
@@ -34,6 +39,7 @@ def generar_pdf_pro(n_folio, nombre_cliente, carrito):
     
     pdf.set_fill_color(230, 230, 230)
     pdf.set_font("Arial", 'B', 9)
+    # Reorden de encabezados: Descripcion, U.M, Precio Unit, Cant, Subtotal
     pdf.cell(80, 10, u"Descripcion", border=1, fill=True, align='C')
     pdf.cell(15, 10, "U.M", border=1, fill=True, align='C')
     pdf.cell(35, 10, "Precio Unit.", border=1, fill=True, align='C')
@@ -54,6 +60,11 @@ def generar_pdf_pro(n_folio, nombre_cliente, carrito):
     impuesto = subtotal_acumulado * 0.07
     total_gral = subtotal_acumulado + impuesto
     
+    pdf.set_font("Arial", 'B', 10)
+    pdf.cell(145, 8, "SUBTOTAL:", align='R')
+    pdf.cell(45, 8, f"${subtotal_acumulado:,.0f}", border=1, ln=True, align='R')
+    pdf.cell(145, 8, "IMPUESTO (7%):", align='R')
+    pdf.cell(45, 8, f"${impuesto:,.0f}", border=1, ln=True, align='R')
     pdf.set_font("Arial", 'B', 12)
     pdf.set_fill_color(240, 240, 240)
     pdf.cell(145, 10, "TOTAL COTIZADO:", align='R')
@@ -77,20 +88,19 @@ st.markdown("<h1 style='display: flex; align-items: center;'><i class='material-
 # --- CLIENTE ---
 input_cliente = st.text_input("Nombre del Cliente", placeholder="Ej: PABLO PEREZ", key=f"cli_{st.session_state.cliente_limpio}")
 cliente = input_cliente.upper()
-
 st.write(f"Folio Actual: **#{st.session_state.n_folio}**")
 st.divider()
 
 # --- DATOS DEL ÍTEM ---
 usar_pulgadas = st.toggle("📐 Usar Pulgadas (in)", value=False, key=f"pulg_{st.session_state.item_id}")
-unidad_medida = "in" if usar_pulgadas else "m"
+unidad_m = "in" if usar_pulgadas else "m"
 
 col1, col2 = st.columns(2)
 with col1:
-    ancho = st.number_input(f"Ancho ({unidad_medida})", min_value=0.0, step=0.01, format="%.2f", key=f"anc_{st.session_state.item_id}")
+    ancho = st.number_input(f"Ancho ({unidad_m})", min_value=0.0, step=0.01, format="%.2f", key=f"anc_{st.session_state.item_id}")
     tipo_tela = st.selectbox("Tipo de Tela", ["Seleccione...", "Blackout", "Screen", "Sheer Elegance"], key=f"tel_{st.session_state.item_id}")
 with col2:
-    largo = st.number_input(f"Largo ({unidad_medida})", min_value=0.0, step=0.01, format="%.2f", key=f"lar_{st.session_state.item_id}")
+    largo = st.number_input(f"Largo ({unidad_m})", min_value=0.0, step=0.01, format="%.2f", key=f"lar_{st.session_state.item_id}")
     motor = st.radio("Accionamiento", ["Manual", "Motorizada"], key=f"mot_{st.session_state.item_id}")
 
 cantidad = st.number_input("Cantidad de persianas", min_value=1, step=1, key=f"can_{st.session_state.item_id}")
@@ -107,11 +117,8 @@ if ancho > 0 and largo > 0 and tipo_tela != "Seleccione...":
     
     if st.button("➕ Agregar al carrito"):
         st.session_state.carrito.append({
-            "folio": st.session_state.n_folio,
-            "fecha": datetime.now().strftime("%d/%m/%Y"),
-            "cliente": cliente,
-            "descripcion": f"{tipo_tela} ({ancho}x{largo}{unidad_medida}) {motor}",
-            "unidad": unidad_medida,
+            "descripcion": f"{tipo_tela} ({ancho}x{largo}{unidad_m}) {motor}",
+            "unidad": unidad_m,
             "cantidad": cantidad,
             "valor_item": p_unit,
             "subtotal_item": sub_total_item
@@ -125,18 +132,19 @@ if st.session_state.carrito:
     st.divider()
     st.subheader("🛒 Resumen de Cotización")
     df_resumen = pd.DataFrame(st.session_state.carrito)
-    total_acumulado = df_resumen['subtotal_item'].sum() * 1.07
+    total_cot_sin_iva = df_resumen['subtotal_item'].sum()
+    total_cot_con_iva = total_cot_sin_iva * 1.07
     
-    # CONSTRUCCIÓN EXPLÍCITA PARA EVITAR VALUEERROR
+    # Construcción de tabla de visualización
     df_mostrar = pd.DataFrame()
-    df_mostrar['Folio'] = df_resumen['folio']
-    df_mostrar['Fecha'] = df_resumen['fecha']
-    df_mostrar['Cliente'] = df_resumen['cliente']
+    df_mostrar['Folio'] = [st.session_state.n_folio] * len(df_resumen)
+    df_mostrar['Fecha'] = datetime.now().strftime("%d/%m/%Y")
+    df_mostrar['Cliente'] = cliente
     df_mostrar['Descripción'] = df_resumen['descripcion']
     df_mostrar['U.M'] = df_resumen['unidad']
     df_mostrar['Cantidad'] = df_resumen['cantidad']
     df_mostrar['Valor ítem'] = df_resumen['valor_item'].map('${:,.0f}'.format)
-    df_mostrar['Total cotización'] = f"${total_acumulado:,.0f}"
+    df_mostrar['Total cotización'] = f"${total_cot_con_iva:,.0f}"
     
     st.table(df_mostrar)
     
@@ -153,11 +161,11 @@ if st.session_state.carrito:
         }
         
         if registrar_en_nube(datos_nube):
-            st.success("✅ Datos enviados correctamente.")
+            st.success("✅ ¡Datos enviados correctamente!")
             st.session_state.carrito = []
             st.session_state.cliente_limpio += 1
             st.session_state.item_id += 1 
             st.session_state.n_folio += 1 
             st.rerun()
         else:
-            st.error("❌ Error al registrar en la nube.")
+            st.error("❌ Error al registrar en la nube. Revisa los permisos en AppScript.")

@@ -6,6 +6,9 @@ import json
 from datetime import datetime
 import pandas as pd
 
+# --- CONFIGURACIÓN DE PÁGINA ---
+st.set_page_config(page_title="Persianas Steven", page_icon="🪟", layout="centered")
+
 # --- ESTILOS CSS ---
 st.markdown("""
     <style>
@@ -27,9 +30,6 @@ st.markdown("""
     }
     </style>
     """, unsafe_allow_html=True)
-
-# --- CONFIGURACIÓN DE PÁGINA ---
-st.set_page_config(page_title="Persianas Steven", page_icon="🪟", layout="centered")
 
 URL_APPSCRIPT = "https://script.google.com/macros/s/AKfycbzqJThC_lLO8Rf5vuVlJ59Cf-oB8bgjZ9P8A9rldlyI7khYNqGfOLx17YCF957ZXVnlEw/exec"
 
@@ -58,6 +58,7 @@ if 'carrito' not in st.session_state: st.session_state.carrito = []
 if 'item_id' not in st.session_state: st.session_state.item_id = 0
 if 'cliente_limpio' not in st.session_state: st.session_state.cliente_limpio = 0
 if 'msg_exito' not in st.session_state: st.session_state.msg_exito = False
+if 'bloqueo_envio' not in st.session_state: st.session_state.bloqueo_envio = False
 
 # --- FUNCIÓN PDF ---
 def generar_pdf_pro(n_folio, nombre_cliente, carrito):
@@ -124,7 +125,6 @@ with col2:
     largo = st.number_input(f"Largo ({unidad_m})", min_value=0.0, step=0.01, format="%.2f", value=None, placeholder="0.00", key=f"lar_{st.session_state.item_id}")
     motor = st.radio("Accionamiento", ["Manual", "Motorizada"], key=f"mot_{st.session_state.item_id}")
 
-# ÚNICA MODIFICACIÓN: Cantidad con value=None para que se limpie al agregar
 cantidad = st.number_input("Cantidad", min_value=1, step=1, value=None, placeholder="0", key=f"can_{st.session_state.item_id}")
 
 if ancho and largo and tipo_tela and cantidad:
@@ -169,7 +169,15 @@ if st.session_state.carrito:
     pdf_out, total_f = generar_pdf_pro(st.session_state.n_folio, cliente, st.session_state.carrito)
     st.download_button("📩 Descargar PDF", data=pdf_out, file_name=f"Cotización-{st.session_state.n_folio}.pdf", mime="application/pdf", use_container_width=True)
 
-    if st.button("💾 REGISTRAR Y LIMPIAR TODO", use_container_width=True, type="primary"):
+    # --- LÓGICA DE BLOQUEO DE ENVÍO ---
+    if not st.session_state.bloqueo_envio:
+        if st.button("💾 REGISTRAR Y LIMPIAR TODO", use_container_width=True, type="primary"):
+            st.session_state.bloqueo_envio = True
+            st.rerun()
+    else:
+        # Se ejecuta este bloque cuando ya se hizo clic
+        st.info("⏳ Enviando información al Drive... Por favor espere.")
+        
         datos_nube = {
             "folio": st.session_state.n_folio,
             "fecha": datetime.now().strftime("%d/%m/%Y"),
@@ -177,9 +185,14 @@ if st.session_state.carrito:
             "items_detalle": st.session_state.carrito,
             "total_general": total_f
         }
+        
         if registrar_en_nube(datos_nube):
             st.session_state.msg_exito = True
             st.session_state.carrito = []
             st.session_state.cliente_limpio += 1
             st.session_state.n_folio += 1 
+            st.session_state.bloqueo_envio = False # Liberar para el siguiente
             st.rerun()
+        else:
+            st.error("❌ Error al conectar con el servidor. Reintentando...")
+            st.session_state.bloqueo_envio = False # Permitir reintento

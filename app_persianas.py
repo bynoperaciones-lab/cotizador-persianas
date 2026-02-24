@@ -90,7 +90,7 @@ cliente = input_cliente.upper()
 st.write(f"Folio Actual: **#{st.session_state.n_folio}**")
 st.divider()
 
-# DATOS ÍTEM (MODIFICADOS PARA NO TENER QUE BORRAR)
+# DATOS ÍTEM
 usar_pulgadas = st.toggle("📐 Usar Pulgadas (in)", value=False, key=f"pulg_{st.session_state.item_id}")
 unidad_m = "in" if usar_pulgadas else "m"
 
@@ -102,16 +102,16 @@ with col2:
     largo = st.number_input(f"Largo ({unidad_m})", min_value=0.0, step=0.01, format="%.2f", value=None, placeholder="0.00", key=f"lar_{st.session_state.item_id}")
     motor = st.radio("Accionamiento", ["Manual", "Motorizada"], key=f"mot_{st.session_state.item_id}")
 
-cantidad = st.number_input("Cantidad", min_value=1, step=1, key=f"can_{st.session_state.item_id}")
+# ÚNICA MODIFICACIÓN: Cantidad con value=None para que se limpie al agregar
+cantidad = st.number_input("Cantidad", min_value=1, step=1, value=None, placeholder="0", key=f"can_{st.session_state.item_id}")
 
-if ancho and largo and tipo_tela:
+if ancho and largo and tipo_tela and cantidad:
     factor = 0.0254 if usar_pulgadas else 1.0
     area_f = (ancho * factor * largo * factor) * 1.15
     precios = {"Blackout": 48000, "Screen": 58000, "Sheer Elegance": 88000}
     p_unit = (area_f * precios[tipo_tela]) + (165000 if motor == "Motorizada" else 0)
     sub_total_item = p_unit * cantidad
     
-    # RESTAURADO: Mensaje de área de desperdicio
     st.info(f"Área facturable (con 15% desp.): {area_f:.2f} m²")
     st.success(f"## Subtotal Ítem: ${sub_total_item:,.0f}")
     
@@ -145,7 +145,7 @@ if st.session_state.carrito:
     st.table(df_mostrar)
     
     pdf_out, total_f = generar_pdf_pro(st.session_state.n_folio, cliente, st.session_state.carrito)
-    st.download_button("📩 Descargar PDF", data=pdf_out, file_name=f"Cotización_{st.session_state.n_folio}.pdf", mime="application/pdf", use_container_width=True)
+    st.download_button("📩 Descargar PDF", data=pdf_out, file_name=f"C_{st.session_state.n_folio}.pdf", mime="application/pdf", use_container_width=True)
 
     if st.button("💾 REGISTRAR Y LIMPIAR TODO", use_container_width=True, type="primary"):
         datos_nube = {
@@ -161,4 +161,3 @@ if st.session_state.carrito:
             st.session_state.cliente_limpio += 1
             st.session_state.n_folio += 1 
             st.rerun()
-

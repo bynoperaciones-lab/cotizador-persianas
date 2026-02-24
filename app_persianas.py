@@ -60,7 +60,7 @@ if 'cliente_limpio' not in st.session_state: st.session_state.cliente_limpio = 0
 if 'msg_exito' not in st.session_state: st.session_state.msg_exito = False
 if 'bloqueo_envio' not in st.session_state: st.session_state.bloqueo_envio = False
 
-# --- FUNCIÓN PDF ---
+# --- FUNCIÓN PDF (AQUÍ ES DONDE APLIQUÉ EL DESGLOSE) ---
 def generar_pdf_pro(n_folio, nombre_cliente, carrito):
     pdf = FPDF()
     pdf.add_page()
@@ -92,22 +92,16 @@ def generar_pdf_pro(n_folio, nombre_cliente, carrito):
         pdf.cell(45, 10, f"${item['subtotal_item']:,.0f}", border=1, align='R', ln=True)
         subtotal_acumulado += item['subtotal_item']
     
-    # DESGLOSE DE TOTALES EN PDF (SEGÚN IMAGEN)
+    # DESGLOSE SOLO PARA EL PDF
     impuesto = subtotal_acumulado * 0.07
     total_gral = subtotal_acumulado + impuesto
     
     pdf.ln(5)
     pdf.set_font("Arial", 'B', 10)
-    
-    # Subtotal
     pdf.cell(145, 8, "SUBTOTAL:", align='R')
     pdf.cell(45, 8, f"${subtotal_acumulado:,.0f}", border=1, ln=True, align='R')
-    
-    # Impuesto
     pdf.cell(145, 8, "IMPUESTO (7%):", align='R')
     pdf.cell(45, 8, f"${impuesto:,.0f}", border=1, ln=True, align='R')
-    
-    # Total
     pdf.set_fill_color(240, 240, 240)
     pdf.cell(145, 10, "TOTAL COTIZADO:", align='R')
     pdf.cell(45, 10, f"${total_gral:,.0f}", border=1, ln=True, align='R', fill=True)
@@ -162,32 +156,23 @@ if ancho and largo and tipo_tela and cantidad:
         st.session_state.item_id += 1
         st.rerun()
 
-# RESUMEN Y REGISTRO
+# RESUMEN Y REGISTRO (RESTAURADA LA TABLA ORIGINAL)
 if st.session_state.carrito:
     st.divider()
     df_resumen = pd.DataFrame(st.session_state.carrito)
+    total_c = df_resumen['subtotal_item'].sum() * 1.07
     
-    # CÁLCULOS DESGLOSADOS
-    subtotal_gral = df_resumen['subtotal_item'].sum()
-    impuesto_gral = subtotal_gral * 0.07
-    total_gral = subtotal_gral + impuesto_gral
-    
-    # Preparar tabla visual
     df_mostrar = pd.DataFrame()
+    df_mostrar['Folio'] = [st.session_state.n_folio] * len(df_resumen)
+    df_mostrar['Fecha'] = datetime.now().strftime("%d/%m/%Y")
+    df_mostrar['Cliente'] = cliente
     df_mostrar['Descripción'] = df_resumen['descripcion']
     df_mostrar['U.M'] = df_resumen['unidad']
-    df_mostrar['Precio Unit.'] = df_resumen['valor_item'].map('${:,.0f}'.format)
-    df_mostrar['Cant.'] = df_resumen['cantidad']
-    df_mostrar['Subtotal'] = df_resumen['subtotal_item'].map('${:,.0f}'.format)
+    df_mostrar['Cantidad'] = df_resumen['cantidad']
+    df_mostrar['Valor ítem'] = df_resumen['valor_item'].map('${:,.0f}'.format)
+    df_mostrar['Total cotización'] = f"${total_c:,.0f}"
     
     st.table(df_mostrar)
-    
-    # Resumen de totales a la derecha
-    col_t1, col_t2 = st.columns([2, 1])
-    with col_t2:
-        st.write(f"**SUBTOTAL:** ${subtotal_gral:,.0f}")
-        st.write(f"**IMPUESTO (7%):** ${impuesto_gral:,.0f}")
-        st.markdown(f"### TOTAL: ${total_gral:,.0f}")
     
     pdf_out, total_f = generar_pdf_pro(st.session_state.n_folio, cliente, st.session_state.carrito)
     st.download_button("📩 Descargar PDF", data=pdf_out, file_name=f"Cotización-{st.session_state.n_folio}.pdf", mime="application/pdf", use_container_width=True)

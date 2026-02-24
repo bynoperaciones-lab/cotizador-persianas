@@ -9,18 +9,37 @@ import pandas as pd
 # --- CONFIGURACIÓN DE PÁGINA ---
 st.set_page_config(page_title="Persianas Steven", page_icon="🪟", layout="centered")
 
-# TU URL DE APPSCRIPT
 URL_APPSCRIPT = "https://script.google.com/macros/s/AKfycbzqJThC_lLO8Rf5vuVlJ59Cf-oB8bgjZ9P8A9rldlyI7khYNqGfOLx17YCF957ZXVnlEw/exec"
 
 # --- FUNCIONES NUBE ---
+def obtener_ultimo_folio():
+    try:
+        # Tu script tiene un doGet que devuelve el último folio
+        response = requests.get(URL_APPSCRIPT, timeout=10)
+        if response.status_code == 200:
+            return int(response.text) + 1
+    except:
+        return None
+
 def registrar_en_nube(datos):
     try:
-        response = requests.post(URL_APPSCRIPT, data=json.dumps(datos), timeout=10)
-        # Volvemos a tu validación original que sí funcionaba
-        return response.status_code == 200
-    except: return False
+        response = requests.post(URL_APPSCRIPT, data=json.dumps(datos), timeout=15, allow_redirects=True)
+        return response.status_code == 200 or "Exito" in response.text
+    except: 
+        return False
 
-# --- FUNCIÓN PDF PROFESIONAL (CON COLUMNA U.M) ---
+# --- ESTADO DE SESIÓN ---
+# Si es la primera vez que abre, intentamos traer el folio real del Drive
+if 'n_folio' not in st.session_state:
+    folio_real = obtener_ultimo_folio()
+    st.session_state.n_folio = folio_real if folio_real else 1
+
+if 'carrito' not in st.session_state: st.session_state.carrito = []
+if 'item_id' not in st.session_state: st.session_state.item_id = 0
+if 'cliente_limpio' not in st.session_state: st.session_state.cliente_limpio = 0
+if 'msg_exito' not in st.session_state: st.session_state.msg_exito = False
+
+# --- FUNCIÓN PDF ---
 def generar_pdf_pro(n_folio, nombre_cliente, carrito):
     pdf = FPDF()
     pdf.add_page()
@@ -36,7 +55,6 @@ def generar_pdf_pro(n_folio, nombre_cliente, carrito):
     
     pdf.set_fill_color(230, 230, 230)
     pdf.set_font("Arial", 'B', 9)
-    # Encabezados: Descripcion, U.M, Precio Unit, Cant, Subtotal
     pdf.cell(80, 10, u"Descripcion", border=1, fill=True, align='C')
     pdf.cell(15, 10, "U.M", border=1, fill=True, align='C')
     pdf.cell(35, 10, "Precio Unit.", border=1, fill=True, align='C')
@@ -53,42 +71,35 @@ def generar_pdf_pro(n_folio, nombre_cliente, carrito):
         pdf.cell(45, 10, f"${item['subtotal_item']:,.0f}", border=1, align='R', ln=True)
         subtotal_acumulado += item['subtotal_item']
     
+    total_gral = subtotal_acumulado * 1.07
     pdf.ln(5)
-    impuesto = subtotal_acumulado * 0.07
-    total_gral = subtotal_acumulado + impuesto
-    
-    pdf.set_font("Arial", 'B', 10)
-    pdf.cell(145, 8, "SUBTOTAL:", align='R')
-    pdf.cell(45, 8, f"${subtotal_acumulado:,.0f}", border=1, ln=True, align='R')
-    pdf.cell(145, 8, "IMPUESTO (7%):", align='R')
-    pdf.cell(45, 8, f"${impuesto:,.0f}", border=1, ln=True, align='R')
     pdf.set_font("Arial", 'B', 12)
     pdf.set_fill_color(240, 240, 240)
     pdf.cell(145, 10, "TOTAL COTIZADO:", align='R')
     pdf.cell(45, 10, f"${total_gral:,.0f}", border=1, ln=True, align='R', fill=True)
     return pdf.output(dest='S').encode('latin-1'), total_gral
 
-# --- ESTADO DE SESIÓN ---
-if 'n_folio' not in st.session_state:
-    st.session_state.n_folio = 1
-if 'carrito' not in st.session_state:
-    st.session_state.carrito = []
-if 'item_id' not in st.session_state:
-    st.session_state.item_id = 0
-if 'cliente_limpio' not in st.session_state:
-    st.session_state.cliente_limpio = 0
-
-# --- TÍTULO ---
+# --- INTERFAZ ---
 st.markdown('<link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">', unsafe_allow_html=True)
 st.markdown("<h1 style='display: flex; align-items: center;'><i class='material-icons' style='font-size: 45px; margin-right: 15px; color: #4F8BF9;'>window</i>Persianas Steven</h1>", unsafe_allow_html=True)
 
-# --- CLIENTE ---
+if st.session_state.msg_exito:
+    st.success("✅ ¡Registro Enviado al Drive con éxito!")
+    st.session_state.msg_exito = False
+
+# Botón manual de sincronización por si acaso
+if st.sidebar.button("🔄 Sincronizar Folio con Drive"):
+    nuevo_f = obtener_ultimo_folio()
+    if nuevo_f:
+        st.session_state.n_folio = nuevo_f
+        st.sidebar.success(f"Folio actualizado a #{nuevo_f}")
+
 input_cliente = st.text_input("Nombre del Cliente", placeholder="Ej: PABLO PEREZ", key=f"cli_{st.session_state.cliente_limpio}")
 cliente = input_cliente.upper()
 st.write(f"Folio Actual: **#{st.session_state.n_folio}**")
 st.divider()
 
-# --- DATOS DEL ÍTEM ---
+# DATOS ÍTEM
 usar_pulgadas = st.toggle("📐 Usar Pulgadas (in)", value=False, key=f"pulg_{st.session_state.item_id}")
 unidad_m = "in" if usar_pulgadas else "m"
 
@@ -100,7 +111,7 @@ with col2:
     largo = st.number_input(f"Largo ({unidad_m})", min_value=0.0, step=0.01, format="%.2f", key=f"lar_{st.session_state.item_id}")
     motor = st.radio("Accionamiento", ["Manual", "Motorizada"], key=f"mot_{st.session_state.item_id}")
 
-cantidad = st.number_input("Cantidad de persianas", min_value=1, step=1, key=f"can_{st.session_state.item_id}")
+cantidad = st.number_input("Cantidad", min_value=1, step=1, key=f"can_{st.session_state.item_id}")
 
 if ancho > 0 and largo > 0 and tipo_tela != "Seleccione...":
     factor = 0.0254 if usar_pulgadas else 1.0
@@ -109,9 +120,7 @@ if ancho > 0 and largo > 0 and tipo_tela != "Seleccione...":
     p_unit = (area_f * precios[tipo_tela]) + (165000 if motor == "Motorizada" else 0)
     sub_total_item = p_unit * cantidad
     
-    st.info(f"Área facturable (con 15% desp.): {area_f:.2f} m²")
-    st.success(f"## Subtotal Ítem: ${sub_total_item:,.0f}")
-    
+    st.info(f"Área facturable: {area_f:.2f} m²")
     if st.button("➕ Agregar al carrito"):
         st.session_state.carrito.append({
             "descripcion": f"{tipo_tela} ({ancho}x{largo}{unidad_m}) {motor}",
@@ -120,18 +129,15 @@ if ancho > 0 and largo > 0 and tipo_tela != "Seleccione...":
             "valor_item": p_unit,
             "subtotal_item": sub_total_item
         })
-        st.toast("Ítem añadido")
         st.session_state.item_id += 1
         st.rerun()
 
-# --- RESUMEN EN TABLA ---
+# RESUMEN Y REGISTRO
 if st.session_state.carrito:
     st.divider()
-    st.subheader("🛒 Resumen de Cotización")
     df_resumen = pd.DataFrame(st.session_state.carrito)
-    total_cot_con_iva = df_resumen['subtotal_item'].sum() * 1.07
+    total_c = df_resumen['subtotal_item'].sum() * 1.07
     
-    # Tabla de visualización (8 columnas)
     df_mostrar = pd.DataFrame()
     df_mostrar['Folio'] = [st.session_state.n_folio] * len(df_resumen)
     df_mostrar['Fecha'] = datetime.now().strftime("%d/%m/%Y")
@@ -140,12 +146,12 @@ if st.session_state.carrito:
     df_mostrar['U.M'] = df_resumen['unidad']
     df_mostrar['Cantidad'] = df_resumen['cantidad']
     df_mostrar['Valor ítem'] = df_resumen['valor_item'].map('${:,.0f}'.format)
-    df_mostrar['Total cotización'] = f"${total_cot_con_iva:,.0f}"
+    df_mostrar['Total cotización'] = f"${total_c:,.0f}"
     
     st.table(df_mostrar)
     
-    pdf_output, total_final = generar_pdf_pro(st.session_state.n_folio, cliente, st.session_state.carrito)
-    st.download_button(label="📩 Descargar PDF", data=pdf_output, file_name=f"Cotizacion_{st.session_state.n_folio}.pdf", mime="application/pdf", use_container_width=True)
+    pdf_out, total_f = generar_pdf_pro(st.session_state.n_folio, cliente, st.session_state.carrito)
+    st.download_button("📩 Descargar PDF", data=pdf_out, file_name=f"C_{st.session_state.n_folio}.pdf", mime="application/pdf", use_container_width=True)
 
     if st.button("💾 REGISTRAR Y LIMPIAR TODO", use_container_width=True, type="primary"):
         datos_nube = {
@@ -153,15 +159,11 @@ if st.session_state.carrito:
             "fecha": datetime.now().strftime("%d/%m/%Y"),
             "cliente": cliente if cliente else "CONSUMIDOR FINAL",
             "items_detalle": st.session_state.carrito,
-            "total_general": total_final
+            "total_general": total_f
         }
-        
         if registrar_en_nube(datos_nube):
-            st.success("✅ ¡Datos enviados correctamente!")
+            st.session_state.msg_exito = True
             st.session_state.carrito = []
             st.session_state.cliente_limpio += 1
-            st.session_state.item_id += 1 
             st.session_state.n_folio += 1 
             st.rerun()
-        else:
-            st.error("❌ Error al registrar en la nube.")

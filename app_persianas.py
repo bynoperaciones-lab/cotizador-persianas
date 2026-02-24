@@ -14,7 +14,6 @@ URL_APPSCRIPT = "https://script.google.com/macros/s/AKfycbzqJThC_lLO8Rf5vuVlJ59C
 # --- FUNCIONES NUBE ---
 def obtener_ultimo_folio():
     try:
-        # Tu script tiene un doGet que devuelve el último folio
         response = requests.get(URL_APPSCRIPT, timeout=10)
         if response.status_code == 200:
             return int(response.text) + 1
@@ -29,7 +28,6 @@ def registrar_en_nube(datos):
         return False
 
 # --- ESTADO DE SESIÓN ---
-# Si es la primera vez que abre, intentamos traer el folio real del Drive
 if 'n_folio' not in st.session_state:
     folio_real = obtener_ultimo_folio()
     st.session_state.n_folio = folio_real if folio_real else 1
@@ -87,19 +85,12 @@ if st.session_state.msg_exito:
     st.success("✅ ¡Registro Enviado al Drive con éxito!")
     st.session_state.msg_exito = False
 
-# Botón manual de sincronización por si acaso
-if st.sidebar.button("🔄 Sincronizar Folio con Drive"):
-    nuevo_f = obtener_ultimo_folio()
-    if nuevo_f:
-        st.session_state.n_folio = nuevo_f
-        st.sidebar.success(f"Folio actualizado a #{nuevo_f}")
-
 input_cliente = st.text_input("Nombre del Cliente", placeholder="Ej: PABLO PEREZ", key=f"cli_{st.session_state.cliente_limpio}")
 cliente = input_cliente.upper()
 st.write(f"Folio Actual: **#{st.session_state.n_folio}**")
 st.divider()
 
-# DATOS ÍTEM
+# DATOS ÍTEM (SIN ÁREA DE DESPERDICIO VISIBLE)
 usar_pulgadas = st.toggle("📐 Usar Pulgadas (in)", value=False, key=f"pulg_{st.session_state.item_id}")
 unidad_m = "in" if usar_pulgadas else "m"
 
@@ -114,13 +105,15 @@ with col2:
 cantidad = st.number_input("Cantidad", min_value=1, step=1, key=f"can_{st.session_state.item_id}")
 
 if ancho > 0 and largo > 0 and tipo_tela != "Seleccione...":
+    # El cálculo interno se mantiene para el precio, pero ya no se muestra el mensaje de área
     factor = 0.0254 if usar_pulgadas else 1.0
     area_f = (ancho * factor * largo * factor) * 1.15
     precios = {"Blackout": 48000, "Screen": 58000, "Sheer Elegance": 88000}
     p_unit = (area_f * precios[tipo_tela]) + (165000 if motor == "Motorizada" else 0)
     sub_total_item = p_unit * cantidad
     
-    st.info(f"Área facturable: {area_f:.2f} m²")
+    st.success(f"## Subtotal Ítem: ${sub_total_item:,.0f}")
+    
     if st.button("➕ Agregar al carrito"):
         st.session_state.carrito.append({
             "descripcion": f"{tipo_tela} ({ancho}x{largo}{unidad_m}) {motor}",

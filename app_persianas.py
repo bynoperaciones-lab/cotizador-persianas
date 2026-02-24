@@ -6,6 +6,28 @@ import json
 from datetime import datetime
 import pandas as pd
 
+# --- ESTILOS CSS ---
+st.markdown("""
+    <style>
+    #MainMenu {visibility: hidden;}
+    footer {visibility: hidden;}
+    header {visibility: hidden;}
+    .stAppDeployButton {display:none;}
+    div[data-testid="stToolbar"] { visibility: hidden !important; }
+    
+    div.stButton > button:first-child[kind="primary"] {
+        background-color: #28a745 !important;
+        border-color: #28a745 !important;
+        color: white !important;
+    }
+    .stColumn div.stButton > button[kind="primary"] {
+        background-color: #dc3545 !important;
+        border-color: #dc3545 !important;
+        color: white !important;
+    }
+    </style>
+    """, unsafe_allow_html=True)
+
 # --- CONFIGURACIÓN DE PÁGINA ---
 st.set_page_config(page_title="Persianas Steven", page_icon="🪟", layout="centered")
 
@@ -161,3 +183,4 @@ if st.session_state.carrito:
             st.session_state.cliente_limpio += 1
             st.session_state.n_folio += 1 
             st.rerun()
+

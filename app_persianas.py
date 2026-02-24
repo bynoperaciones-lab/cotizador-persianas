@@ -167,7 +167,7 @@ if st.session_state.carrito:
     st.table(df_mostrar)
     
     pdf_out, total_f = generar_pdf_pro(st.session_state.n_folio, cliente, st.session_state.carrito)
-    st.download_button("📩 Descargar PDF", data=pdf_out, file_name=f"C_{st.session_state.n_folio}.pdf", mime="application/pdf", use_container_width=True)
+    st.download_button("📩 Descargar PDF", data=pdf_out, file_name=f"Cotización-{st.session_state.n_folio}.pdf", mime="application/pdf", use_container_width=True)
 
     if st.button("💾 REGISTRAR Y LIMPIAR TODO", use_container_width=True, type="primary"):
         datos_nube = {
@@ -183,4 +183,3 @@ if st.session_state.carrito:
             st.session_state.cliente_limpio += 1
             st.session_state.n_folio += 1 
             st.rerun()
-

@@ -6,9 +6,6 @@ import json
 from datetime import datetime
 import pandas as pd
 
-# --- CONFIGURACIÓN DE PÁGINA ---
-st.set_page_config(page_title="Persianas Steven", page_icon="🪟", layout="centered")
-
 # --- ESTILOS CSS ---
 st.markdown("""
     <style>
@@ -30,6 +27,9 @@ st.markdown("""
     }
     </style>
     """, unsafe_allow_html=True)
+
+# --- CONFIGURACIÓN DE PÁGINA ---
+st.set_page_config(page_title="Persianas Steven", page_icon="🪟", layout="centered")
 
 URL_APPSCRIPT = "https://script.google.com/macros/s/AKfycbzqJThC_lLO8Rf5vuVlJ59Cf-oB8bgjZ9P8A9rldlyI7khYNqGfOLx17YCF957ZXVnlEw/exec"
 
@@ -92,11 +92,12 @@ def generar_pdf_pro(n_folio, nombre_cliente, carrito):
         pdf.cell(45, 10, f"${item['subtotal_item']:,.0f}", border=1, align='R', ln=True)
         subtotal_acumulado += item['subtotal_item']
     
+    # CÁLCULO DE IMPUESTO 7% EN PDF
     total_gral = subtotal_acumulado * 1.07
     pdf.ln(5)
     pdf.set_font("Arial", 'B', 12)
     pdf.set_fill_color(240, 240, 240)
-    pdf.cell(145, 10, "TOTAL COTIZADO:", align='R')
+    pdf.cell(145, 10, "TOTAL COTIZADO (Inc. 7%):", align='R')
     pdf.cell(45, 10, f"${total_gral:,.0f}", border=1, ln=True, align='R', fill=True)
     return pdf.output(dest='S').encode('latin-1'), total_gral
 
@@ -152,6 +153,8 @@ if ancho and largo and tipo_tela and cantidad:
 if st.session_state.carrito:
     st.divider()
     df_resumen = pd.DataFrame(st.session_state.carrito)
+    
+    # CÁLCULO DE TOTAL CON IMPUESTO 7%
     total_c = df_resumen['subtotal_item'].sum() * 1.07
     
     df_mostrar = pd.DataFrame()
@@ -162,22 +165,20 @@ if st.session_state.carrito:
     df_mostrar['U.M'] = df_resumen['unidad']
     df_mostrar['Cantidad'] = df_resumen['cantidad']
     df_mostrar['Valor ítem'] = df_resumen['valor_item'].map('${:,.0f}'.format)
-    df_mostrar['Total cotización'] = f"${total_c:,.0f}"
+    df_mostrar['Total (con 7%)'] = f"${total_c:,.0f}"
     
     st.table(df_mostrar)
     
     pdf_out, total_f = generar_pdf_pro(st.session_state.n_folio, cliente, st.session_state.carrito)
     st.download_button("📩 Descargar PDF", data=pdf_out, file_name=f"Cotización-{st.session_state.n_folio}.pdf", mime="application/pdf", use_container_width=True)
 
-    # --- LÓGICA DE BLOQUEO DE ENVÍO ---
+    # LÓGICA DE CONTROL DE ENVÍO PARA EVITAR DUPLICADOS
     if not st.session_state.bloqueo_envio:
         if st.button("💾 REGISTRAR Y LIMPIAR TODO", use_container_width=True, type="primary"):
             st.session_state.bloqueo_envio = True
             st.rerun()
     else:
-        # Se ejecuta este bloque cuando ya se hizo clic
         st.info("⏳ Enviando información al Drive... Por favor espere.")
-        
         datos_nube = {
             "folio": st.session_state.n_folio,
             "fecha": datetime.now().strftime("%d/%m/%Y"),
@@ -185,14 +186,13 @@ if st.session_state.carrito:
             "items_detalle": st.session_state.carrito,
             "total_general": total_f
         }
-        
         if registrar_en_nube(datos_nube):
             st.session_state.msg_exito = True
             st.session_state.carrito = []
             st.session_state.cliente_limpio += 1
             st.session_state.n_folio += 1 
-            st.session_state.bloqueo_envio = False # Liberar para el siguiente
+            st.session_state.bloqueo_envio = False
             st.rerun()
         else:
-            st.error("❌ Error al conectar con el servidor. Reintentando...")
-            st.session_state.bloqueo_envio = False # Permitir reintento
+            st.error("Error al registrar. Intente de nuevo.")
+            st.session_state.bloqueo_envio = False

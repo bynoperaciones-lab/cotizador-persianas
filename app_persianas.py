@@ -96,9 +96,7 @@ unidad_m = "in" if usar_pulgadas else "m"
 
 col1, col2 = st.columns(2)
 with col1:
-    # Usamos value=None y un placeholder para que el campo esté limpio al tocarlo
     ancho = st.number_input(f"Ancho ({unidad_m})", min_value=0.0, step=0.01, format="%.2f", value=None, placeholder="0.00", key=f"anc_{st.session_state.item_id}")
-    # index=None hace que la lista empiece vacía
     tipo_tela = st.selectbox("Tipo de Tela", ["Blackout", "Screen", "Sheer Elegance"], index=None, placeholder="Seleccione tela...", key=f"tel_{st.session_state.item_id}")
 with col2:
     largo = st.number_input(f"Largo ({unidad_m})", min_value=0.0, step=0.01, format="%.2f", value=None, placeholder="0.00", key=f"lar_{st.session_state.item_id}")
@@ -106,7 +104,6 @@ with col2:
 
 cantidad = st.number_input("Cantidad", min_value=1, step=1, key=f"can_{st.session_state.item_id}")
 
-# Verificamos que los campos tengan datos antes de calcular
 if ancho and largo and tipo_tela:
     factor = 0.0254 if usar_pulgadas else 1.0
     area_f = (ancho * factor * largo * factor) * 1.15
@@ -114,6 +111,8 @@ if ancho and largo and tipo_tela:
     p_unit = (area_f * precios[tipo_tela]) + (165000 if motor == "Motorizada" else 0)
     sub_total_item = p_unit * cantidad
     
+    # RESTAURADO: Mensaje de área de desperdicio
+    st.info(f"Área facturable (con 15% desp.): {area_f:.2f} m²")
     st.success(f"## Subtotal Ítem: ${sub_total_item:,.0f}")
     
     if st.button("➕ Agregar al carrito"):

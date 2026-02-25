@@ -6,13 +6,12 @@ import json
 from datetime import datetime
 import pandas as pd
 import time
-import pytz # Librería para la zona horaria
+import pytz
 
 # --- 1. MOTOR DE ESTABILIDAD Y ZONA HORARIA ---
 if 'last_interaction' not in st.session_state:
     st.session_state.last_interaction = time.time()
 
-# Definimos la zona horaria de Colombia para evitar errores de fecha
 colombia_tz = pytz.timezone('America/Bogota')
 fecha_hoy = datetime.now(colombia_tz).strftime("%d/%m/%Y")
 
@@ -41,7 +40,8 @@ st.markdown("""
     </style>
     """, unsafe_allow_html=True)
 
-URL_APPSCRIPT = "https://script.google.com/macros/s/AKfycbzqJThC_lLO8Rf5vuVlJ59Cf-oB8bgjZ9P8A9rldlyI7khYNqGfOLx17YCF957ZXVnlEw/exec"
+# NUEVA URL DE IMPLEMENTACIÓN
+URL_APPSCRIPT = "https://script.google.com/macros/s/AKfycbxVFX5JzM8LJsi5EdA6eWq33PD-ZlVY0xhbTzDG15c_fPkoswEdw4qrtiaVwJQsgWU-Uw/exec"
 
 # --- FUNCIONES NUBE ---
 def obtener_ultimo_folio():
@@ -79,7 +79,6 @@ def generar_pdf_pro(n_folio, nombre_cliente, carrito):
     pdf.ln(10)
     pdf.set_font("Arial", 'B', 12)
     pdf.cell(100, 10, txt=f"Cotizacion No: {n_folio}")
-    # Usamos la fecha corregida de Colombia
     pdf.cell(100, 10, txt=f"Fecha: {fecha_hoy}", ln=True, align='R')
     pdf.set_font("Arial", '', 12)
     pdf.cell(200, 10, txt=f"Cliente: {nombre_cliente}", ln=True)
@@ -143,7 +142,6 @@ with col2:
     largo = st.number_input(f"Largo ({unidad_m})", min_value=0.0, step=0.01, format="%.2f", value=None, placeholder="0.00", key=f"lar_{st.session_state.item_id}")
     motor = st.radio("Accionamiento", ["Manual", "Motorizada"], key=f"mot_{st.session_state.item_id}")
 
-# CORRECCIÓN: Cantidad empieza en 1 para que sirvan los botones +/-
 cantidad = st.number_input("Cantidad", min_value=1, step=1, value=1, key=f"can_{st.session_state.item_id}")
 
 if ancho and largo and tipo_tela and cantidad:
@@ -175,7 +173,7 @@ if st.session_state.carrito:
     
     df_mostrar = pd.DataFrame()
     df_mostrar['Folio'] = [st.session_state.n_folio] * len(df_resumen)
-    df_mostrar['Fecha'] = fecha_hoy # Usamos fecha corregida
+    df_mostrar['Fecha'] = fecha_hoy
     df_mostrar['Cliente'] = cliente
     df_mostrar['Descripción'] = df_resumen['descripcion']
     df_mostrar['U.M'] = df_resumen['unidad']
@@ -196,7 +194,7 @@ if st.session_state.carrito:
         st.info("⏳ Enviando información al Drive... Por favor espere.")
         datos_nube = {
             "folio": st.session_state.n_folio,
-            "fecha": fecha_hoy, # Enviamos fecha corregida al Drive
+            "fecha": fecha_hoy,
             "cliente": cliente if cliente else "CONSUMIDOR FINAL",
             "items_detalle": st.session_state.carrito,
             "total_general": total_f

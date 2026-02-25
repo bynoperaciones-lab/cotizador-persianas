@@ -5,12 +5,16 @@ import requests
 import json
 from datetime import datetime
 import pandas as pd
+import time
 
 # --- 1. MOTOR DE ESTABILIDAD (Keep-Alive) ---
 # Esto evita que la sesión se "congele" cuando el celular entra en reposo
 if 'last_interaction' not in st.session_state:
     st.session_state.last_interaction = time.time()
-    
+
+# --- CONFIGURACIÓN DE PÁGINA ---
+st.set_page_config(page_title="Persianas Steven", page_icon="🪟", layout="centered")
+
 # --- ESTILOS CSS ---
 st.markdown("""
     <style>
@@ -32,9 +36,6 @@ st.markdown("""
     }
     </style>
     """, unsafe_allow_html=True)
-
-# --- CONFIGURACIÓN DE PÁGINA ---
-st.set_page_config(page_title="Persianas Steven", page_icon="🪟", layout="centered")
 
 URL_APPSCRIPT = "https://script.google.com/macros/s/AKfycbzqJThC_lLO8Rf5vuVlJ59Cf-oB8bgjZ9P8A9rldlyI7khYNqGfOLx17YCF957ZXVnlEw/exec"
 
@@ -65,7 +66,7 @@ if 'cliente_limpio' not in st.session_state: st.session_state.cliente_limpio = 0
 if 'msg_exito' not in st.session_state: st.session_state.msg_exito = False
 if 'bloqueo_envio' not in st.session_state: st.session_state.bloqueo_envio = False
 
-# --- FUNCIÓN PDF (AQUÍ ES DONDE APLIQUÉ EL DESGLOSE) ---
+# --- FUNCIÓN PDF ---
 def generar_pdf_pro(n_folio, nombre_cliente, carrito):
     pdf = FPDF()
     pdf.add_page()
@@ -97,7 +98,6 @@ def generar_pdf_pro(n_folio, nombre_cliente, carrito):
         pdf.cell(45, 10, f"${item['subtotal_item']:,.0f}", border=1, align='R', ln=True)
         subtotal_acumulado += item['subtotal_item']
     
-    # DESGLOSE SOLO PARA EL PDF
     impuesto = subtotal_acumulado * 0.07
     total_gral = subtotal_acumulado + impuesto
     
@@ -161,7 +161,7 @@ if ancho and largo and tipo_tela and cantidad:
         st.session_state.item_id += 1
         st.rerun()
 
-# RESUMEN Y REGISTRO (RESTAURADA LA TABLA ORIGINAL)
+# RESUMEN Y REGISTRO
 if st.session_state.carrito:
     st.divider()
     df_resumen = pd.DataFrame(st.session_state.carrito)
@@ -182,7 +182,6 @@ if st.session_state.carrito:
     pdf_out, total_f = generar_pdf_pro(st.session_state.n_folio, cliente, st.session_state.carrito)
     st.download_button("📩 Descargar PDF", data=pdf_out, file_name=f"Cotización-{st.session_state.n_folio}.pdf", mime="application/pdf", use_container_width=True)
 
-    # LÓGICA DE CONTROL DE ENVÍO
     if not st.session_state.bloqueo_envio:
         if st.button("💾 REGISTRAR Y LIMPIAR TODO", use_container_width=True, type="primary"):
             st.session_state.bloqueo_envio = True
@@ -206,4 +205,3 @@ if st.session_state.carrito:
         else:
             st.error("Error al registrar. Intente de nuevo.")
             st.session_state.bloqueo_envio = False
-

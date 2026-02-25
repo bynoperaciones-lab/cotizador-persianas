@@ -6,6 +6,11 @@ import json
 from datetime import datetime
 import pandas as pd
 
+# --- 1. MOTOR DE ESTABILIDAD (Keep-Alive) ---
+# Esto evita que la sesión se "congele" cuando el celular entra en reposo
+if 'last_interaction' not in st.session_state:
+    st.session_state.last_interaction = time.time()
+    
 # --- ESTILOS CSS ---
 st.markdown("""
     <style>
@@ -201,3 +206,4 @@ if st.session_state.carrito:
         else:
             st.error("Error al registrar. Intente de nuevo.")
             st.session_state.bloqueo_envio = False
+
